@@ -3,6 +3,7 @@ import { Card, Button, SparkleBurst, Toast, WindowEditSheet } from '../component
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { formatWindowSince, formatTime, formatDuration } from '../lib/time';
+import { enqueueEntry, getLatestWindowEnd, getQueue, subscribeToQueue } from '../lib/offlineQueue';
 
 const DRAFT_STORAGE_KEY = 'littlehours_draft_entry';
 
@@ -37,8 +38,8 @@ export const LogPage: React.FC = () => {
     return localStorage.getItem(DRAFT_STORAGE_KEY) || '';
   });
 
-  // Time window states
-  // Default window start is 1 hour before now until latest entry is loaded
+  // Time window states:
+  // Default window start accounts for queued entries, using latest end time among saved and queued
   const [defaultStart, setDefaultStart] = useState<Date>(() => new Date(Date.now() - 60 * 60 * 1000));
   const [customWindow, setCustomWindow] = useState<{ start: Date; end: Date } | null>(null);
 
@@ -51,6 +52,7 @@ export const LogPage: React.FC = () => {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [sparkleActive, setSparkleActive] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('Saved');
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -69,13 +71,37 @@ export const LogPage: React.FC = () => {
     adjustTextareaHeight();
   }, []);
 
-  // 2. Fetch latest entry to determine window_start and last log line
+  // 2. Fetch latest window end among saved and queued entries
   useEffect(() => {
     if (!user) return;
 
     let isMounted = true;
 
-    async function fetchLatestEntry() {
+    async function loadLatest() {
+      // Account for queued entries: latest end time among saved and queued
+      const latestEnd = await getLatestWindowEnd(user!.id);
+      if (!isMounted) return;
+
+      if (latestEnd) {
+        setDefaultStart(latestEnd);
+      } else {
+        setDefaultStart(new Date(Date.now() - 60 * 60 * 1000));
+      }
+
+      // Check last entry from offline queue first
+      const queue = await getQueue();
+      const userQueue = queue.filter((e) => e.user_id === user!.id);
+      if (userQueue.length > 0) {
+        const latestQ = userQueue[0];
+        setLastEntry({
+          window_start: latestQ.window_start,
+          window_end: latestQ.window_end,
+          raw_text: latestQ.raw_text,
+        });
+        return;
+      }
+
+      // Otherwise fetch latest saved from Supabase
       try {
         const { data, error } = await supabase
           .from('entries')
@@ -91,21 +117,27 @@ export const LogPage: React.FC = () => {
         }
 
         if (isMounted && data) {
-          setDefaultStart(new Date(data.window_end));
           setLastEntry(data);
-        } else if (isMounted) {
-          // If no entries yet, default to one hour before now
-          setDefaultStart(new Date(Date.now() - 60 * 60 * 1000));
         }
       } catch (err) {
         console.error('Failed to load latest entry:', err);
       }
     }
 
-    fetchLatestEntry();
+    loadLatest();
+
+    // Subscribe to queue changes so defaultStart stays synchronized
+    const unsubscribe = subscribeToQueue(async () => {
+      if (!isMounted) return;
+      const latestEnd = await getLatestWindowEnd(user!.id);
+      if (latestEnd) {
+        setDefaultStart(latestEnd);
+      }
+    });
 
     return () => {
       isMounted = false;
+      unsubscribe();
     };
   }, [user]);
 
@@ -131,7 +163,7 @@ export const LogPage: React.FC = () => {
     setCustomWindow({ start: newStart, end: newEnd });
   };
 
-  // Save entry
+  // Save entry (handles both online save and offline queue)
   const handleSave = async () => {
     if (isSaving || !text.trim() || !user) return;
 
@@ -140,45 +172,39 @@ export const LogPage: React.FC = () => {
 
     const startToSave = customWindow ? customWindow.start : defaultStart;
     const endToSave = customWindow ? customWindow.end : new Date();
-
     const entryId = crypto.randomUUID();
+    const rawText = text.trim();
 
-    try {
-      const { error } = await supabase.from('entries').insert({
-        id: entryId,
-        user_id: user.id,
-        raw_text: text.trim(),
-        window_start: startToSave.toISOString(),
-        window_end: endToSave.toISOString(),
-        parse_status: 'pending',
-        follow_ups: [],
-      });
+    const entryPayload = {
+      id: entryId,
+      user_id: user.id,
+      raw_text: rawText,
+      window_start: startToSave.toISOString(),
+      window_end: endToSave.toISOString(),
+      parse_status: 'pending',
+      follow_ups: [],
+      created_at: new Date().toISOString(),
+    };
 
-      if (error) {
-        setSaveError('We could not save your entry right now. Please check your connection and try again.');
-        setIsSaving(false);
-        return;
-      }
+    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
 
-      // 1. Clear text and draft
+    const finalizeSave = (wasOffline: boolean) => {
       setText('');
       localStorage.removeItem(DRAFT_STORAGE_KEY);
       if (textareaRef.current) {
         textareaRef.current.style.height = '120px';
       }
 
-      // 2. Advance default window start to this entry's end
       setDefaultStart(endToSave);
       setCustomWindow(null);
 
-      // 3. Update last log line
       setLastEntry({
         window_start: startToSave.toISOString(),
         window_end: endToSave.toISOString(),
-        raw_text: text.trim(),
+        raw_text: rawText,
       });
 
-      // 4. Trigger animations (sparkle burst and toast)
+      setToastMessage(wasOffline ? 'Saved (waiting to sync)' : 'Saved');
       setSparkleActive(true);
       setToastVisible(true);
 
@@ -186,13 +212,43 @@ export const LogPage: React.FC = () => {
         setSparkleActive(false);
       }, 700);
 
-      // Re-focus textarea for seamless next entry
       setTimeout(() => {
         textareaRef.current?.focus();
       }, 100);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      setSaveError(`We could not save your entry (${message}). Please try again.`);
+    };
+
+    if (isOffline) {
+      // Store in IndexedDB
+      await enqueueEntry(entryPayload);
+      finalizeSave(true);
+      setIsSaving(false);
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from('entries').insert(entryPayload);
+
+      if (error) {
+        const isNetworkErr =
+          error.message?.toLowerCase().includes('failed to fetch') ||
+          error.message?.toLowerCase().includes('network') ||
+          !navigator.onLine;
+
+        if (isNetworkErr) {
+          await enqueueEntry(entryPayload);
+          finalizeSave(true);
+        } else {
+          setSaveError('We could not save your entry right now. Please check your connection and try again.');
+        }
+        setIsSaving(false);
+        return;
+      }
+
+      finalizeSave(false);
+    } catch {
+      // Network exception during fetch
+      await enqueueEntry(entryPayload);
+      finalizeSave(true);
     } finally {
       setIsSaving(false);
     }
@@ -200,7 +256,7 @@ export const LogPage: React.FC = () => {
 
   return (
     <div className="page-container screen-fade-in log-page">
-      <Toast visible={toastVisible} onClose={() => setToastVisible(false)} />
+      <Toast visible={toastVisible} message={toastMessage} onClose={() => setToastVisible(false)} />
 
       {/* Window indicator with pencil icon */}
       <div className="log-window-header">

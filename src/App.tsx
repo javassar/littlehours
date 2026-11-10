@@ -1,14 +1,22 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { Header, TabBar, ProtectedRoute } from './components';
 import { LogPage, HistoryPage, SettingsPage, LoginPage, DesignPage } from './pages';
 import { useAuth } from './lib/auth';
+import { initOfflineSync } from './lib/offlineQueue';
 
 export const App: React.FC = () => {
   const { user } = useAuth();
   const location = useLocation();
   const isLoginPage = location.pathname === '/login';
   const showNav = Boolean(user && !isLoginPage);
+
+  useEffect(() => {
+    if (user) {
+      const cleanup = initOfflineSync();
+      return cleanup;
+    }
+  }, [user]);
 
   return (
     <>

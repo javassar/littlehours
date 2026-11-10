@@ -18,6 +18,13 @@ import {
   getDayKey,
   formatDurationMs,
 } from '../lib/time';
+import {
+  getQueue,
+  subscribeToQueue,
+  enqueueEntry,
+  dequeueEntry,
+  QueuedEntry,
+} from '../lib/offlineQueue';
 
 const PAGE_SIZE = 30;
 
@@ -26,6 +33,7 @@ export const HistoryPage: React.FC = () => {
   const timeZone = settings?.timezone || 'America/Phoenix';
 
   const [entries, setEntries] = useState<EntryItem[]>([]);
+  const [queuedEntries, setQueuedEntries] = useState<QueuedEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingEarlier, setLoadingEarlier] = useState(false);
   const [hasMore, setHasMore] = useState(false);
@@ -47,6 +55,17 @@ export const HistoryPage: React.FC = () => {
     setToastMessage(msg);
     setToastVisible(true);
   };
+
+  // Load offline queue
+  const loadQueued = useCallback(async () => {
+    if (!user) return;
+    try {
+      const q = await getQueue();
+      setQueuedEntries(q.filter((e) => e.user_id === user.id));
+    } catch (err) {
+      console.error('Failed to load queued entries in History:', err);
+    }
+  }, [user]);
 
   // Fetch entries from Supabase
   const fetchEntries = useCallback(
@@ -88,7 +107,21 @@ export const HistoryPage: React.FC = () => {
 
   useEffect(() => {
     fetchEntries(0, true);
-  }, [fetchEntries]);
+    loadQueued();
+
+    // Subscribe to queue changes so UI refreshes as soon as items sync or are queued
+    const unsubscribe = subscribeToQueue(async (updatedQueue) => {
+      if (user) {
+        setQueuedEntries(updatedQueue.filter((e) => e.user_id === user.id));
+        // Refresh server entries to show recently synced items
+        fetchEntries(0, false);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [fetchEntries, loadQueued, user]);
 
   // Load next page
   const handleLoadEarlier = async () => {
@@ -96,11 +129,29 @@ export const HistoryPage: React.FC = () => {
     await fetchEntries(offset, false);
   };
 
-  // Handle entry edit save
+  // Handle entry edit save (supports both queued offline and synced entries)
   const handleSaveEntry = async (
     id: string,
     updated: { raw_text: string; window_start: string; window_end: string }
   ) => {
+    const isQueued = queuedEntries.some((e) => e.id === id);
+
+    if (isQueued) {
+      await enqueueEntry({
+        id,
+        user_id: user!.id,
+        raw_text: updated.raw_text,
+        window_start: updated.window_start,
+        window_end: updated.window_end,
+        parse_status: 'pending',
+        follow_ups: [],
+        created_at: new Date().toISOString(),
+      });
+      await loadQueued();
+      showToast('Changes saved');
+      return;
+    }
+
     const { error } = await supabase
       .from('entries')
       .update({
@@ -121,8 +172,17 @@ export const HistoryPage: React.FC = () => {
     showToast('Changes saved');
   };
 
-  // Handle entry delete
+  // Handle entry delete (supports both queued offline and synced entries)
   const handleDeleteEntry = async (id: string) => {
+    const isQueued = queuedEntries.some((e) => e.id === id);
+
+    if (isQueued) {
+      await dequeueEntry(id);
+      await loadQueued();
+      showToast('Entry deleted');
+      return;
+    }
+
     const { error } = await supabase.from('entries').delete().eq('id', id);
 
     if (error) {
@@ -150,8 +210,8 @@ export const HistoryPage: React.FC = () => {
     );
   }
 
-  // Empty state with Deer illustration
-  if (entries.length === 0) {
+  // Empty state with Deer illustration (only if neither server entries nor queued entries exist)
+  if (entries.length === 0 && queuedEntries.length === 0) {
     return (
       <div className="page-container screen-fade-in">
         <div className="empty-history-state">
@@ -164,7 +224,7 @@ export const HistoryPage: React.FC = () => {
     );
   }
 
-  // Group entries by day in user's timezone
+  // Group synced entries by day in user's timezone
   interface DayGroup {
     heading: string;
     entries: {
@@ -196,6 +256,69 @@ export const HistoryPage: React.FC = () => {
     <div className="page-container screen-fade-in history-page">
       <Toast visible={toastVisible} message={toastMessage} onClose={() => setToastVisible(false)} />
 
+      {/* 1. Queued offline entries shown at the very top with "Waiting to sync" badge */}
+      {queuedEntries.length > 0 && (
+        <section className="history-day-section history-queued-section">
+          <h2 className="history-day-heading" style={{ color: 'var(--mauve)' }}>
+            Waiting to sync ({queuedEntries.length})
+          </h2>
+
+          <div className="history-entries-list">
+            {queuedEntries.map((entry) => {
+              const start = new Date(entry.window_start);
+              const end = new Date(entry.window_end);
+              const rangeStr = formatTimeRange(start, end, timeZone);
+              const durationStr = formatDuration(start, end);
+
+              return (
+                <Card
+                  key={entry.id}
+                  ornamental={true}
+                  className="history-entry-card history-queued-card"
+                  onClick={() => handleCardClick(entry)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleCardClick(entry);
+                    }
+                  }}
+                  aria-label={`Entry from ${rangeStr}, waiting to sync. Click to edit.`}
+                >
+                  <div className="history-card-header">
+                    <span className="history-time-range">{rangeStr}</span>
+
+                    <div className="history-card-header-actions">
+                      <span className="history-duration-badge">{durationStr}</span>
+                      <span className="history-waiting-badge">
+                        <span className="waiting-pulse-dot" />
+                        Waiting to sync
+                      </span>
+                      <button
+                        type="button"
+                        className="history-card-trash-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEntryToDelete(entry);
+                        }}
+                        aria-label="Delete this queued entry"
+                        title="Delete this entry"
+                      >
+                        <TrashIcon size={15} color="var(--danger)" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <p className="history-card-text">{entry.raw_text}</p>
+                </Card>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* 2. Synced history entries grouped by day */}
       {dayGroups.map((group) => (
         <section key={group.heading} className="history-day-section">
           <h2 className="history-day-heading">{group.heading}</h2>
@@ -244,7 +367,7 @@ export const HistoryPage: React.FC = () => {
                   >
                     <div className="history-card-header">
                       <span className="history-time-range">{rangeStr}</span>
-                      
+
                       <div className="history-card-header-actions">
                         <span className="history-duration-badge">{durationStr}</span>
                         <button
