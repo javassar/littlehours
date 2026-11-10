@@ -12,6 +12,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       injectManifest: {
         injectionPoint: 'self.__WB_MANIFEST',
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest,woff,woff2}'],
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
       manifest: {
         name: 'Little Hours',

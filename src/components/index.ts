@@ -9,4 +9,5 @@ export * from './Sparkles';
 export * from './WindowEditSheet';
 export * from './EntryEditSheet';
 export * from './ProtectedRoute';
+export * from './InstallBanner';
 export * from './illustrations';

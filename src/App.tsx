@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
-import { Header, TabBar, ProtectedRoute } from './components';
+import { Header, TabBar, ProtectedRoute, InstallBanner } from './components';
 import { LogPage, HistoryPage, SettingsPage, LoginPage, DesignPage } from './pages';
 import { useAuth } from './lib/auth';
 import { initOfflineSync } from './lib/offlineQueue';
@@ -21,6 +21,7 @@ export const App: React.FC = () => {
   return (
     <>
       {showNav && <Header />}
+      {showNav && <InstallBanner />}
       
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         <Routes>
