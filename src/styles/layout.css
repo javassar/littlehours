@@ -171,6 +171,29 @@
   max-width: 360px;
 }
 
+.login-error-message {
+  background-color: rgba(168, 80, 94, 0.08);
+  border: 1px solid rgba(168, 80, 94, 0.3);
+  color: var(--danger);
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.45;
+  margin-bottom: 14px;
+  animation: screenFadeIn var(--transition-fast) forwards;
+}
+
+.login-unconfigured-note {
+  background-color: rgba(140, 155, 181, 0.15);
+  border: 1px solid rgba(140, 155, 181, 0.35);
+  color: var(--ink);
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  margin-bottom: 14px;
+}
+
 /* Design Page Specific */
 .design-page {
   padding-bottom: 130px;

@@ -6,4 +6,5 @@ export * from './Header';
 export * from './TabBar';
 export * from './Toast';
 export * from './Sparkles';
+export * from './ProtectedRoute';
 export * from './illustrations';
