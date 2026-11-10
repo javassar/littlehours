@@ -69,33 +69,134 @@
 }
 
 /* Log Screen Elements */
-.page-header-intro {
-  margin-bottom: 16px;
+.log-window-header {
+  margin-bottom: 14px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
 }
 
-.window-pill {
+.window-pill-button {
   display: inline-flex;
   align-items: center;
+  min-height: 44px;
+  padding: 8px 16px;
+  border-radius: var(--radius-button);
+  background-color: var(--surface);
+  border: 1px solid rgba(184, 114, 127, 0.3);
+  box-shadow: 0 1px 3px rgba(75, 51, 64, 0.06);
   font-family: var(--font-display);
   font-weight: 500;
-  font-size: 18px;
+  font-size: 19px;
   color: var(--ink);
-  background-color: rgba(251, 246, 243, 0.7);
-  padding: 6px 14px;
-  border-radius: 999px;
-  border: 1px solid rgba(184, 114, 127, 0.2);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), transform 100ms ease;
 }
 
-.prompt-label {
+.window-pill-button:hover {
+  background-color: #f7eee9;
+  border-color: var(--rose-deep);
+}
+
+.window-pill-button:active {
+  transform: translateY(1px);
+}
+
+.window-pill-custom {
+  border-color: var(--rose-deep);
+  background-color: rgba(217, 165, 174, 0.15);
+}
+
+.window-reset-link {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--mauve);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.log-save-error {
+  background-color: rgba(168, 80, 94, 0.08);
+  border: 1px solid rgba(168, 80, 94, 0.3);
+  color: var(--danger);
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.45;
+  margin-bottom: 14px;
+  animation: screenFadeIn var(--transition-fast) forwards;
+}
+
+.log-input-card {
+  margin-bottom: 16px;
+}
+
+.main-log-textarea {
+  min-height: 120px;
+  border: none;
+  background-color: var(--surface-sunk);
+  box-shadow: var(--shadow-input-sunk);
+  border-radius: 14px;
+  padding: 14px 16px;
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: var(--text-body-line-height);
+  color: var(--ink);
+  width: 100%;
+  box-sizing: border-box;
+  resize: none;
+  overflow: hidden;
+  transition: height 100ms ease-out;
+}
+
+.main-log-textarea::placeholder {
   font-family: var(--font-display);
   font-style: italic;
+  font-size: 21px;
+  color: var(--mauve);
+  opacity: 0.8;
+}
+
+.log-button-wrap {
+  margin-top: 16px;
+}
+
+/* Last log line under text box */
+.last-log-line {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background-color: rgba(251, 246, 243, 0.65);
+  border: 1px solid rgba(184, 114, 127, 0.18);
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--mauve);
+  animation: screenFadeIn var(--transition-base) forwards;
+}
+
+.last-log-meta {
+  font-family: var(--font-body);
   font-weight: 500;
-  font-size: 22px;
   color: var(--ink);
-  margin-bottom: 12px;
+}
+
+.last-log-separator {
+  color: var(--rose-deep);
+  opacity: 0.7;
+}
+
+.last-log-text {
+  font-family: var(--font-body);
+  font-style: italic;
+  color: var(--mauve);
 }
 
 /* Empty History State */
