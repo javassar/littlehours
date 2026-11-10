@@ -1,19 +1,148 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Button, Hummingbird, Chip } from '../components';
+import { Card, Button, Hummingbird, Chip, Toast } from '../components';
 import { useAuth } from '../lib/auth';
+import { supabase } from '../lib/supabase';
+import {
+  prepareExportRows,
+  generateCSV,
+  generateJSON,
+  getExportFileName,
+  downloadFile,
+  ExportEntry,
+} from '../lib/export';
+import { getQueue } from '../lib/offlineQueue';
 
 export const SettingsPage: React.FC = () => {
   const { user, settings, signOut } = useAuth();
   const navigate = useNavigate();
+  const timeZone = settings?.timezone || 'America/Phoenix';
+
+  // Date range filter for export (optional, defaults to all)
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [exporting, setExporting] = useState<'csv' | 'json' | null>(null);
+  const [exportStatus, setExportStatus] = useState<string | null>(null);
+
+  // Toast feedback
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastVisible, setToastVisible] = useState(false);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setToastVisible(true);
+  };
 
   const handleSignOut = async () => {
     await signOut();
     navigate('/login', { replace: true });
   };
 
+  const fetchExportEntries = async (): Promise<ExportEntry[]> => {
+    if (!user) return [];
+
+    let query = supabase
+      .from('entries')
+      .select('id, window_start, window_end, raw_text, created_at')
+      .eq('user_id', user.id)
+      .order('window_start', { ascending: true });
+
+    if (fromDate) {
+      const startOfDay = new Date(`${fromDate}T00:00:00`);
+      query = query.gte('window_start', startOfDay.toISOString());
+    }
+
+    if (toDate) {
+      const endOfDay = new Date(`${toDate}T23:59:59.999`);
+      query = query.lte('window_end', endOfDay.toISOString());
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const serverEntries = (data || []) as ExportEntry[];
+
+    // Also include any matching queued offline entries
+    try {
+      const queue = await getQueue();
+      const userQueue = queue.filter((e) => e.user_id === user.id);
+      for (const qEntry of userQueue) {
+        // If not already in serverEntries
+        if (!serverEntries.some((s) => s.id === qEntry.id)) {
+          let match = true;
+          if (fromDate) {
+            match = match && new Date(qEntry.window_start) >= new Date(`${fromDate}T00:00:00`);
+          }
+          if (toDate) {
+            match = match && new Date(qEntry.window_end) <= new Date(`${toDate}T23:59:59.999`);
+          }
+          if (match) {
+            serverEntries.push({
+              id: qEntry.id,
+              window_start: qEntry.window_start,
+              window_end: qEntry.window_end,
+              raw_text: qEntry.raw_text,
+              created_at: qEntry.created_at || qEntry.queued_at,
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Could not read offline queue for export:', e);
+    }
+
+    // Sort chronologically ascending
+    serverEntries.sort((a, b) => new Date(a.window_start).getTime() - new Date(b.window_start).getTime());
+    return serverEntries;
+  };
+
+  const handleExport = async (format: 'csv' | 'json') => {
+    setExporting(format);
+    setExportStatus(null);
+
+    try {
+      const rawEntries = await fetchExportEntries();
+
+      if (rawEntries.length === 0) {
+        setExportStatus('No entries found for the selected date range.');
+        showToast('No entries to export');
+        setExporting(null);
+        return;
+      }
+
+      const rows = prepareExportRows(rawEntries, timeZone);
+      const filename = getExportFileName(format, timeZone);
+
+      if (format === 'csv') {
+        const csvContent = generateCSV(rows);
+        downloadFile(csvContent, filename, 'text/csv;charset=utf-8;');
+        showToast(`Exported ${rows.length} entries to CSV`);
+      } else {
+        const jsonContent = generateJSON(rows);
+        downloadFile(jsonContent, filename, 'application/json;charset=utf-8;');
+        showToast(`Exported ${rows.length} entries to JSON`);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      setExportStatus(`Failed to export entries: ${msg}`);
+      showToast('Export failed');
+    } finally {
+      setExporting(null);
+    }
+  };
+
+  const handleClearDateRange = () => {
+    setFromDate('');
+    setToDate('');
+    setExportStatus(null);
+  };
+
   return (
-    <div className="page-container screen-fade-in">
+    <div className="page-container screen-fade-in settings-page">
+      <Toast visible={toastVisible} message={toastMessage} onClose={() => setToastVisible(false)} />
+
       <h2 className="screen-heading">Settings</h2>
 
       {/* Account Info */}
@@ -27,14 +156,89 @@ export const SettingsPage: React.FC = () => {
         </Button>
       </Card>
 
+      {/* Export Section (Milestone 1.6) */}
+      <Card className="settings-card mb-4">
+        <h3 className="section-title">Export Entries</h3>
+        <p className="section-desc" style={{ marginBottom: 16 }}>
+          Download your complete history as CSV or JSON for spreadsheets and analysis.
+        </p>
+
+        {/* Date range filter */}
+        <div className="export-range-group">
+          <div className="export-date-field">
+            <label className="sheet-label" htmlFor="export-from-date">
+              From (optional)
+            </label>
+            <input
+              id="export-from-date"
+              type="date"
+              className="sheet-datetime-input"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              aria-label="Export from date"
+            />
+          </div>
+
+          <div className="export-date-field">
+            <label className="sheet-label" htmlFor="export-to-date">
+              To (optional)
+            </label>
+            <input
+              id="export-to-date"
+              type="date"
+              className="sheet-datetime-input"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              aria-label="Export to date"
+            />
+          </div>
+        </div>
+
+        {(fromDate || toDate) && (
+          <div style={{ marginTop: 8, marginBottom: 14 }}>
+            <button
+              type="button"
+              className="window-reset-link"
+              onClick={handleClearDateRange}
+            >
+              Clear date filter (export all entries)
+            </button>
+          </div>
+        )}
+
+        {exportStatus && (
+          <div className="sheet-error" style={{ marginTop: 12, marginBottom: 12 }}>
+            {exportStatus}
+          </div>
+        )}
+
+        <div className="export-button-row" style={{ marginTop: 16 }}>
+          <Button
+            onClick={() => handleExport('csv')}
+            disabled={exporting !== null}
+            aria-label="Export CSV"
+          >
+            {exporting === 'csv' ? 'Exporting CSV...' : 'Export CSV'}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => handleExport('json')}
+            disabled={exporting !== null}
+            aria-label="Export JSON"
+          >
+            {exporting === 'json' ? 'Exporting JSON...' : 'Export JSON'}
+          </Button>
+        </div>
+      </Card>
+
       {/* Preferences & Default Timezone */}
       <Card className="settings-card mb-4">
         <h3 className="section-title">Preferences</h3>
         <p className="section-desc" style={{ marginBottom: 8 }}>
-          Timezone: <strong>{settings?.timezone || 'America/Phoenix'}</strong>
+          Timezone: <strong>{timeZone}</strong>
         </p>
         <p className="section-desc">
-          Push reminders and export options will appear here in upcoming milestones.
+          Push reminders will appear here in Stage 3.
         </p>
       </Card>
 

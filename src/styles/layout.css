@@ -405,6 +405,30 @@
   margin-bottom: 16px;
 }
 
+/* Export Section Elements */
+.export-range-group {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.export-date-field {
+  flex: 1;
+  min-width: 130px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.export-button-row {
+  display: flex;
+  gap: 12px;
+}
+
+.export-button-row > * {
+  flex: 1;
+}
+
 /* Settings elements */
 .settings-footer {
   display: flex;
