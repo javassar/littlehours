@@ -1,5 +1,6 @@
 import { get, set } from 'idb-keyval';
 import { supabase, isSupabaseConfigured } from './supabase.ts';
+import { parseEntryInBackground } from './parse.ts';
 
 const QUEUE_STORAGE_KEY = 'littlehours_offline_queue';
 
@@ -9,7 +10,7 @@ export interface QueuedEntry {
   raw_text: string;
   window_start: string;
   window_end: string;
-  parse_status: string;
+  parse_status?: 'pending' | 'parsed' | 'needs_clarification' | 'failed';
   follow_ups: any[];
   created_at: string;
   queued_at: string;
@@ -165,6 +166,8 @@ export async function syncQueue(onEntrySynced?: (id: string) => void): Promise<{
           remainingQueue.push(entry);
         } else {
           syncedCount++;
+          // Trigger background AI parsing for the newly synced entry
+          parseEntryInBackground(entry.id);
           if (onEntrySynced) {
             onEntrySynced(entry.id);
           }

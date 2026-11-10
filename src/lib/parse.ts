@@ -1,0 +1,68 @@
+/**
+ * Milestone 2.2: Background AI parsing triggers and helpers
+ */
+
+import { supabase } from './supabase';
+
+/**
+ * Triggers the parse-entry Edge Function in the background.
+ * Saving never waits for this call to complete.
+ */
+export async function parseEntryInBackground(entryId: string): Promise<void> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      console.warn('Cannot parse entry in background: No active session.');
+      return;
+    }
+
+    const { data, error } = await supabase.functions.invoke('parse-entry', {
+      body: { entry_id: entryId },
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+
+    if (error) {
+      console.warn(`parse-entry returned error for ${entryId}:`, error.message);
+      // Mark as failed in DB if possible so UI shows "Try again"
+      await supabase
+        .from('entries')
+        .update({
+          parse_status: 'failed',
+          clarification_question: error.message,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', entryId);
+    } else if (data?.status === 'failed') {
+      console.warn(`parse-entry logic failed for ${entryId}:`, data.error);
+    }
+  } catch (err) {
+    console.warn(`Exception during background parse for ${entryId}:`, err);
+    try {
+      await supabase
+        .from('entries')
+        .update({ parse_status: 'failed', updated_at: new Date().toISOString() })
+        .eq('id', entryId);
+    } catch {
+      // Offline, ignore
+    }
+  }
+}
+
+/**
+ * Re-trigger parsing for an entry that failed.
+ */
+export async function retryParseEntry(entryId: string): Promise<void> {
+  try {
+    await supabase
+      .from('entries')
+      .update({ parse_status: 'pending', updated_at: new Date().toISOString() })
+      .eq('id', entryId);
+  } catch (err) {
+    console.warn('Could not update parse_status to pending:', err);
+  }
+
+  // Trigger in background
+  parseEntryInBackground(entryId);
+}

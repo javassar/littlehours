@@ -356,6 +356,114 @@
   word-break: break-word;
 }
 
+/* AI Parsing states and segments */
+.history-card-parsing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(184, 114, 127, 0.3);
+}
+
+.history-parsing-text {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 15px;
+  color: var(--mauve);
+}
+
+.history-card-failed {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(168, 80, 94, 0.3);
+}
+
+.history-failed-text {
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  color: var(--danger);
+  font-style: italic;
+}
+
+.history-retry-btn {
+  background: transparent;
+  border: 1px solid var(--rose-deep);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 3px 11px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), transform 100ms ease;
+  white-space: nowrap;
+}
+
+.history-retry-btn:hover {
+  background-color: rgba(217, 165, 174, 0.25);
+  transform: translateY(-1px);
+}
+
+.history-retry-btn:active {
+  transform: translateY(0);
+}
+
+.history-retry-btn:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.history-card-segments {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(184, 114, 127, 0.2);
+}
+
+.history-segment-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  background-color: rgba(246, 237, 234, 0.6);
+  border: 1px solid rgba(184, 114, 127, 0.18);
+}
+
+.history-segment-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.history-segment-time {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--mauve);
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.history-segment-label {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--ink);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Dotted unlogged gap line between entries */
 .history-gap-indicator {
   display: flex;

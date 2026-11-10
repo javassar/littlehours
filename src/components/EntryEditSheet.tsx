@@ -3,11 +3,26 @@ import { Button } from './Button';
 import { toDateTimeLocalValue, fromDateTimeLocalValue, formatDuration } from '../lib/time';
 import './EntryEditSheet.css';
 
+export interface SegmentItem {
+  id: string;
+  entry_id: string;
+  start_time: string;
+  end_time: string;
+  activity_label: string;
+  category: string;
+  confirmed: boolean;
+  model?: string;
+  prompt_version?: string;
+}
+
 export interface EntryItem {
   id: string;
   raw_text: string;
   window_start: string;
   window_end: string;
+  parse_status?: 'pending' | 'parsed' | 'needs_clarification' | 'failed';
+  clarification_question?: string | null;
+  segments?: SegmentItem[];
   created_at: string;
 }
 

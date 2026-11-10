@@ -8,9 +8,11 @@ import {
   RotatingSparkle,
   EntryItem,
   TrashIcon,
+  Chip,
 } from '../components';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
+import { retryParseEntry } from '../lib/parse';
 import {
   formatTimeRange,
   formatDuration,
@@ -76,7 +78,26 @@ export const HistoryPage: React.FC = () => {
       try {
         const { data, error } = await supabase
           .from('entries')
-          .select('id, raw_text, window_start, window_end, created_at')
+          .select(`
+            id,
+            raw_text,
+            window_start,
+            window_end,
+            parse_status,
+            clarification_question,
+            created_at,
+            segments (
+              id,
+              entry_id,
+              start_time,
+              end_time,
+              activity_label,
+              category,
+              confirmed,
+              model,
+              prompt_version
+            )
+          `)
           .eq('user_id', user.id)
           .order('window_end', { ascending: false })
           .range(fromOffset, fromOffset + PAGE_SIZE - 1);
@@ -86,7 +107,15 @@ export const HistoryPage: React.FC = () => {
           return;
         }
 
-        const newRows = (data || []) as EntryItem[];
+        const newRows = (data || []).map((e: any) => ({
+          ...e,
+          segments: Array.isArray(e.segments)
+            ? e.segments.sort(
+                (a: any, b: any) =>
+                  new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+              )
+            : [],
+        })) as EntryItem[];
         setHasMore(newRows.length === PAGE_SIZE);
 
         if (fromOffset === 0) {
@@ -122,6 +151,68 @@ export const HistoryPage: React.FC = () => {
       unsubscribe();
     };
   }, [fetchEntries, loadQueued, user]);
+
+  // Poll for background AI parsing updates whenever any entry has parse_status === 'pending'
+  useEffect(() => {
+    const hasPending = entries.some((e) => e.parse_status === 'pending');
+    if (!hasPending || !user) return;
+
+    const timer = setInterval(async () => {
+      const pendingIds = entries.filter((e) => e.parse_status === 'pending').map((e) => e.id);
+      if (pendingIds.length === 0) return;
+
+      const { data, error } = await supabase
+        .from('entries')
+        .select(`
+          id,
+          parse_status,
+          clarification_question,
+          segments (
+            id,
+            entry_id,
+            start_time,
+            end_time,
+            activity_label,
+            category,
+            confirmed,
+            model,
+            prompt_version
+          )
+        `)
+        .in('id', pendingIds);
+
+      if (error || !data) return;
+
+      setEntries((prev) =>
+        prev.map((item) => {
+          const updated = data.find((d: any) => d.id === item.id);
+          if (updated && updated.parse_status !== item.parse_status) {
+            return {
+              ...item,
+              parse_status: updated.parse_status,
+              clarification_question: updated.clarification_question,
+              segments: Array.isArray(updated.segments)
+                ? (updated.segments as any[]).sort(
+                    (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+                  )
+                : [],
+            };
+          }
+          return item;
+        })
+      );
+    }, 2500);
+
+    return () => clearInterval(timer);
+  }, [entries, user]);
+
+  const handleRetryParse = async (entryId: string) => {
+    setEntries((prev) =>
+      prev.map((e) => (e.id === entryId ? { ...e, parse_status: 'pending' } : e))
+    );
+    showToast('Reading your entry...');
+    await retryParseEntry(entryId);
+  };
 
   // Load next page
   const handleLoadEarlier = async () => {
@@ -386,6 +477,55 @@ export const HistoryPage: React.FC = () => {
                     </div>
 
                     <p className="history-card-text">{entry.raw_text}</p>
+
+                    {/* 1. Pending parsing state: rotating sparkle + "Reading your entry" */}
+                    {entry.parse_status === 'pending' && (
+                      <div className="history-card-parsing" aria-label="Reading your entry">
+                        <RotatingSparkle size={15} color="var(--mauve)" />
+                        <span className="history-parsing-text">Reading your entry</span>
+                      </div>
+                    )}
+
+                    {/* 2. Failed parsing state: "I couldn't read that one" + Try again button */}
+                    {entry.parse_status === 'failed' && (
+                      <div className="history-card-failed" onClick={(e) => e.stopPropagation()}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: 1 }}>
+                          <span className="history-failed-text">I couldn't read that one</span>
+                          {entry.clarification_question && (
+                            <span style={{ fontSize: 11, color: 'var(--mauve)', fontStyle: 'normal', opacity: 0.85, wordBreak: 'break-word' }}>
+                              {entry.clarification_question.slice(0, 90)}
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          className="history-retry-btn"
+                          onClick={() => handleRetryParse(entry.id)}
+                        >
+                          Try again
+                        </button>
+                      </div>
+                    )}
+
+                    {/* 3. Parsed segments: time range, label, category chip */}
+                    {entry.segments && entry.segments.length > 0 && (
+                      <div className="history-card-segments">
+                        {entry.segments.map((seg) => {
+                          const segStart = new Date(seg.start_time);
+                          const segEnd = new Date(seg.end_time);
+                          const segRange = formatTimeRange(segStart, segEnd, timeZone);
+                          return (
+                            <div key={seg.id} className="history-segment-item">
+                              <div className="history-segment-left">
+                                <span className="history-segment-time">{segRange}</span>
+                                <span className="history-segment-label">{seg.activity_label}</span>
+                              </div>
+                              <Chip label={seg.category} size="sm" />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </Card>
 
                   {/* Overlap note */}

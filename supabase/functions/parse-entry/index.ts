@@ -1,6 +1,6 @@
 /**
- * Milestone 2.1: Supabase Edge Function `parse-entry`
- * Parses a time-log entry into structured time segments using Gemini 2.5 Flash.
+ * Milestone 2.1 & 2.2: Supabase Edge Function `parse-entry`
+ * Parses a time-log entry into structured time segments using Gemini.
  */
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
@@ -112,23 +112,73 @@ Deno.serve(async (req: Request) => {
       .map(({ activity_label, category }) => ({ activity_label, category }));
 
     // 4. Gemini API Configuration
-    const apiKey = Deno.env.get('GEMINI_API_KEY');
-    const model = Deno.env.get('GEMINI_MODEL') || 'gemini-2.5-flash';
+    const rawApiKey = Deno.env.get('GEMINI_API_KEY');
+    const apiKey = rawApiKey ? rawApiKey.trim() : null;
+    const configuredModel = (Deno.env.get('GEMINI_MODEL') || '').trim();
 
     if (!apiKey) {
-      // Mark entry as failed if no API key is configured
+      const missingKeyMsg = 'GEMINI_API_KEY secret is not set in Supabase. Run: npx supabase secrets set GEMINI_API_KEY=...';
       await supabase
         .from('entries')
-        .update({ parse_status: 'failed', updated_at: new Date().toISOString() })
+        .update({
+          parse_status: 'failed',
+          clarification_question: missingKeyMsg,
+          updated_at: new Date().toISOString(),
+        })
         .eq('id', entry.id);
 
       return new Response(
-        JSON.stringify({ error: 'GEMINI_API_KEY secret is not set in Supabase.' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: missingKeyMsg }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    // Query Google AI Studio API for the live list of models enabled for this key
+    let candidateModels: string[] = [];
+    try {
+      const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+      if (listRes.ok) {
+        const listData = await listRes.json();
+        const available = (listData.models || [])
+          .filter((m: any) => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
+          .map((m: any) => m.name.replace(/^models\//, ''));
+        console.log('Available models from ListModels for this key:', available);
+
+        // Put preferred models first
+        if (available.length > 0) {
+          if (configuredModel && available.includes(configuredModel)) {
+            candidateModels.push(configuredModel);
+          }
+          // Add Flash models
+          const flashModels = available.filter((m: string) => m.toLowerCase().includes('flash'));
+          candidateModels.push(...flashModels);
+          // Add other remaining models
+          candidateModels.push(...available);
+        }
+      } else {
+        const listErrText = await listRes.text();
+        console.warn(`ListModels returned status ${listRes.status}:`, listErrText);
+      }
+    } catch (listErr) {
+      console.warn('Error querying ListModels:', listErr);
+    }
+
+    // Fallback model list if ListModels was empty
+    if (candidateModels.length === 0) {
+      candidateModels = [
+        configuredModel || 'gemini-2.5-flash',
+        'gemini-2.5-flash',
+        'gemini-2.0-flash',
+        'gemini-1.5-flash',
+        'gemini-1.5-flash-latest',
+        'gemini-1.5-pro',
+        'gemini-pro',
+      ];
+    }
+
+    // Remove duplicates and empty strings
+    candidateModels = Array.from(new Set(candidateModels.filter(Boolean)));
+    console.log('Final candidate models to attempt:', candidateModels);
 
     const initialUserPayload = {
       raw_text: entry.raw_text,
@@ -140,75 +190,96 @@ Deno.serve(async (req: Request) => {
       follow_ups: entry.follow_ups || [],
     };
 
+    let usedModel = candidateModels[0];
+
     const callGemini = async (contentsHistory: Array<{ role: string; parts: Array<{ text: string }> }>) => {
-      const reqBody = {
-        system_instruction: {
-          parts: [{ text: SYSTEM_PROMPT }],
-        },
-        contents: contentsHistory,
-        generationConfig: {
-          responseMimeType: 'application/json',
-          temperature: 0.2,
-          responseSchema: {
-            type: 'OBJECT',
-            properties: {
-              status: {
-                type: 'STRING',
-                enum: ['parsed', 'needs_clarification'],
-              },
-              question: {
-                type: 'STRING',
-                nullable: true,
-              },
-              segments: {
-                type: 'ARRAY',
-                items: {
-                  type: 'OBJECT',
-                  properties: {
-                    start_time: {
-                      type: 'STRING',
-                      description: 'ISO 8601 with UTC offset',
+      let lastErrorText = '';
+
+      for (const m of candidateModels) {
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${apiKey}`;
+        const reqBody = {
+          system_instruction: {
+            parts: [{ text: SYSTEM_PROMPT }],
+          },
+          contents: contentsHistory,
+          generationConfig: {
+            responseMimeType: 'application/json',
+            temperature: 0.2,
+            responseSchema: {
+              type: 'OBJECT',
+              properties: {
+                status: {
+                  type: 'STRING',
+                  enum: ['parsed', 'needs_clarification'],
+                },
+                question: {
+                  type: 'STRING',
+                  nullable: true,
+                },
+                segments: {
+                  type: 'ARRAY',
+                  items: {
+                    type: 'OBJECT',
+                    properties: {
+                      start_time: {
+                        type: 'STRING',
+                        description: 'ISO 8601 with UTC offset',
+                      },
+                      end_time: {
+                        type: 'STRING',
+                        description: 'ISO 8601 with UTC offset',
+                      },
+                      activity_label: {
+                        type: 'STRING',
+                        description: 'Short lowercase phrase',
+                      },
+                      category: {
+                        type: 'STRING',
+                        description: 'One of the allowed categories',
+                      },
                     },
-                    end_time: {
-                      type: 'STRING',
-                      description: 'ISO 8601 with UTC offset',
-                    },
-                    activity_label: {
-                      type: 'STRING',
-                      description: 'Short lowercase phrase',
-                    },
-                    category: {
-                      type: 'STRING',
-                      description: 'One of the allowed categories',
-                    },
+                    required: ['start_time', 'end_time', 'activity_label', 'category'],
                   },
-                  required: ['start_time', 'end_time', 'activity_label', 'category'],
                 },
               },
+              required: ['status', 'segments'],
             },
-            required: ['status', 'segments'],
           },
-        },
-      };
+        };
 
-      const res = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(reqBody),
-      });
+        const res = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey,
+          },
+          body: JSON.stringify(reqBody),
+        });
 
-      if (!res.ok) {
+        if (res.ok) {
+          usedModel = m;
+          const resData = await res.json();
+          const rawReplyText = resData.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (!rawReplyText) {
+            throw new Error('Gemini API returned empty response candidate.');
+          }
+          return { rawReplyText, parsed: JSON.parse(rawReplyText) as ParseResponse };
+        }
+
         const errText = await res.text();
-        throw new Error(`Gemini API returned ${res.status}: ${errText}`);
+        lastErrorText = `Model ${m} returned ${res.status}: ${errText}`;
+        console.warn(lastErrorText);
+
+        // If it's a 400 or 403 API key issue, don't keep retrying other models
+        if (res.status === 400 && errText.includes('API_KEY_INVALID')) {
+          throw new Error('API key not valid. Please check your GEMINI_API_KEY secret.');
+        }
+        if (res.status === 403) {
+          throw new Error(`Permission denied: ${errText}`);
+        }
       }
 
-      const resData = await res.json();
-      const rawReplyText = resData.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!rawReplyText) {
-        throw new Error('Gemini API returned empty response candidate.');
-      }
-
-      return { rawReplyText, parsed: JSON.parse(rawReplyText) as ParseResponse };
+      throw new Error(`All candidate models failed. Last error: ${lastErrorText}`);
     };
 
     // Contents sequence for multi-turn retry if needed
@@ -223,7 +294,6 @@ Deno.serve(async (req: Request) => {
     let finalValidationError: string | null = null;
 
     if (simulateBroken) {
-      // Simulate broken model reply as required by test checklist
       finalValidationError = 'Simulated broken model reply';
     } else {
       try {
@@ -264,11 +334,13 @@ Deno.serve(async (req: Request) => {
 
     // 5. Handle Final Outcome
     if (!parseResult || finalValidationError) {
-      // Set parse_status = 'failed'
+      console.error(`Setting entry ${entry.id} as failed:`, finalValidationError);
+
       await supabase
         .from('entries')
         .update({
           parse_status: 'failed',
+          clarification_question: finalValidationError || 'Validation failed',
           updated_at: new Date().toISOString(),
         })
         .eq('id', entry.id);
@@ -279,7 +351,7 @@ Deno.serve(async (req: Request) => {
           error: finalValidationError || 'Validation failed',
         }),
         {
-          status: 200, // Return 200 with status 'failed' so caller can inspect reason without crashing
+          status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
@@ -317,7 +389,7 @@ Deno.serve(async (req: Request) => {
       activity_label: seg.activity_label.trim().toLowerCase(),
       category: seg.category.trim().toLowerCase(),
       confirmed: false,
-      model: model,
+      model: usedModel,
       prompt_version: PROMPT_VERSION,
     }));
 
@@ -345,7 +417,7 @@ Deno.serve(async (req: Request) => {
         status: 'parsed',
         segments: newSegments,
         prompt_version: PROMPT_VERSION,
-        model: model,
+        model: usedModel,
       }),
       {
         status: 200,
@@ -355,7 +427,6 @@ Deno.serve(async (req: Request) => {
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : 'Internal Server Error';
 
-    // If an unexpected error occurred and we have an entryId, ensure parse_status is set to 'failed'
     if (entryId) {
       try {
         const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -366,7 +437,11 @@ Deno.serve(async (req: Request) => {
         });
         await supabase
           .from('entries')
-          .update({ parse_status: 'failed', updated_at: new Date().toISOString() })
+          .update({
+            parse_status: 'failed',
+            clarification_question: errorMsg,
+            updated_at: new Date().toISOString(),
+          })
           .eq('id', entryId);
       } catch (dbErr) {
         console.error('Failed to set parse_status failed on exception:', dbErr);

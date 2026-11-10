@@ -4,6 +4,7 @@ import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { formatWindowSince, formatTime, formatDuration } from '../lib/time';
 import { enqueueEntry, getLatestWindowEnd, getQueue, subscribeToQueue } from '../lib/offlineQueue';
+import { parseEntryInBackground } from '../lib/parse';
 
 const DRAFT_STORAGE_KEY = 'littlehours_draft_entry';
 
@@ -181,7 +182,7 @@ export const LogPage: React.FC = () => {
       raw_text: rawText,
       window_start: startToSave.toISOString(),
       window_end: endToSave.toISOString(),
-      parse_status: 'pending',
+      parse_status: 'pending' as const,
       follow_ups: [],
       created_at: new Date().toISOString(),
     };
@@ -245,6 +246,8 @@ export const LogPage: React.FC = () => {
       }
 
       finalizeSave(false);
+      // Background AI parsing: saving never waits for it
+      parseEntryInBackground(entryId);
     } catch {
       // Network exception during fetch
       await enqueueEntry(entryPayload);
