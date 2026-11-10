@@ -1,0 +1,66 @@
+.card {
+  position: relative;
+  background-color: var(--surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  border: 1px solid rgba(184, 114, 127, 0.15);
+  overflow: hidden;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.card-body {
+  position: relative;
+  z-index: 2;
+  padding: 20px;
+}
+
+/* Ornamental double-frame with corner flourishes */
+.card-ornamental {
+  padding: 6px;
+}
+
+.card-ornamental .card-body {
+  padding: 16px;
+}
+
+.card-frame {
+  position: absolute;
+  inset: 6px;
+  border-radius: calc(var(--radius-card) - 6px);
+  border: 1px solid rgba(184, 114, 127, 0.6); /* 1px --rose-deep line at 60% opacity */
+  pointer-events: none;
+  z-index: 1;
+}
+
+.card-frame-inner {
+  position: absolute;
+  inset: 4px; /* 4px gap */
+  border-radius: calc(var(--radius-card) - 10px);
+  border: 1px solid rgba(184, 114, 127, 0.3); /* second 1px line at 30% opacity */
+  pointer-events: none;
+}
+
+.card-flourish {
+  position: absolute;
+  z-index: 3;
+}
+
+.card-flourish-tl {
+  top: 1px;
+  left: 1px;
+}
+
+.card-flourish-tr {
+  top: 1px;
+  right: 1px;
+}
+
+.card-flourish-bl {
+  bottom: 1px;
+  left: 1px;
+}
+
+.card-flourish-br {
+  bottom: 1px;
+  right: 1px;
+}

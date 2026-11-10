@@ -1,0 +1,285 @@
+/* Page Layout & Container */
+.page-container {
+  flex: 1;
+  padding: 20px 16px 110px 16px; /* 110px bottom padding ensures nothing is behind floating tab bar */
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+/* Headings */
+.screen-heading {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 28px;
+  color: var(--ink);
+  margin-bottom: 16px;
+}
+
+.section-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 20px;
+  color: var(--ink);
+  margin-bottom: 10px;
+}
+
+.section-desc {
+  font-size: 15px;
+  color: var(--mauve);
+  line-height: 1.5;
+}
+
+/* Letterpress sunk input & textarea */
+.time-log-input,
+.time-log-textarea {
+  width: 100%;
+  background-color: var(--surface-sunk);
+  box-shadow: var(--shadow-input-sunk);
+  border: 1px solid rgba(184, 114, 127, 0.2);
+  border-radius: var(--radius-input);
+  padding: 14px 16px;
+  font-family: var(--font-body);
+  font-size: 17px; /* Must be >= 16px to prevent iOS Safari auto-zoom */
+  line-height: var(--text-body-line-height);
+  color: var(--ink);
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  resize: vertical;
+}
+
+.time-log-input::placeholder,
+.time-log-textarea::placeholder {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 18px;
+  color: var(--mauve);
+  opacity: 0.75;
+}
+
+.form-label {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--mauve);
+  margin-bottom: 6px;
+}
+
+/* Log Screen Elements */
+.page-header-intro {
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.window-pill {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 18px;
+  color: var(--ink);
+  background-color: rgba(251, 246, 243, 0.7);
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(184, 114, 127, 0.2);
+}
+
+.prompt-label {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 500;
+  font-size: 22px;
+  color: var(--ink);
+  margin-bottom: 12px;
+}
+
+/* Empty History State */
+.empty-history-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 24px;
+  text-align: center;
+}
+
+.empty-history-text {
+  font-family: var(--font-body);
+  font-size: 16px;
+  color: var(--mauve);
+  margin-top: 18px;
+  max-width: 260px;
+  line-height: 1.5;
+}
+
+/* Settings elements */
+.settings-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-top: 48px;
+  text-align: center;
+}
+
+.footer-note {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 15px;
+  color: var(--mauve);
+  margin-top: 8px;
+}
+
+/* Login elements */
+.login-page-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 80px);
+  padding-bottom: 40px;
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.login-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 28px;
+  color: var(--ink);
+  margin-top: 12px;
+}
+
+.login-subtitle {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 18px;
+  color: var(--mauve);
+  margin-top: 4px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 360px;
+}
+
+/* Design Page Specific */
+.design-page {
+  padding-bottom: 130px;
+}
+
+.design-intro {
+  margin-bottom: 24px;
+}
+
+.design-subtitle {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 18px;
+  color: var(--mauve);
+}
+
+.design-section {
+  margin-bottom: 32px;
+}
+
+.color-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.color-swatch-card {
+  background-color: var(--surface);
+  border: 1px solid rgba(184, 114, 127, 0.15);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(75, 51, 64, 0.05);
+}
+
+.color-swatch {
+  height: 48px;
+  width: 100%;
+}
+
+.color-info {
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.color-token {
+  font-family: monospace;
+  font-size: 11px;
+  font-weight: bold;
+  color: var(--ink);
+}
+
+.color-hex {
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--mauve);
+}
+
+.color-name {
+  font-size: 11px;
+  color: var(--ink);
+  opacity: 0.8;
+}
+
+.button-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chips-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.illustrations-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 12px;
+}
+
+.illustration-box {
+  background-color: var(--surface);
+  border-radius: 16px;
+  border: 1px solid rgba(184, 114, 127, 0.15);
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-shadow: 0 1px 4px rgba(75, 51, 64, 0.04);
+}
+
+.illustration-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--ink);
+  margin-top: 10px;
+}
+
+.illustration-desc {
+  font-size: 11px;
+  color: var(--mauve);
+  margin-top: 2px;
+}
+
+.mb-4 {
+  margin-bottom: 16px;
+}

@@ -1,0 +1,7 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Maskable full bleed background -->
+  <rect width="512" height="512" fill="#D9A5AE"/>
+  <!-- Cream four-point sparkle in safe inner circle -->
+  <path d="M256 128 C256 208, 224 240, 128 256 C224 272, 256 304, 256 384 C256 304, 288 272, 384 256 C288 240, 256 208, 256 128 Z" fill="#FBF6F3"/>
+  <circle cx="256" cy="256" r="16" fill="#FFFDFB"/>
+</svg>

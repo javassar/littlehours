@@ -1,0 +1,99 @@
+.tab-bar-container {
+  position: fixed;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  pointer-events: none;
+  padding: 0 16px;
+}
+
+.tab-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  width: 100%;
+  max-width: 360px;
+  height: 60px;
+  background-color: rgba(251, 246, 243, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: var(--radius-button);
+  box-shadow: var(--shadow-tabbar);
+  border: 1px solid rgba(184, 114, 127, 0.22);
+  padding: 0 8px;
+  pointer-events: auto;
+}
+
+.tab-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  min-height: 44px;
+  height: 48px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  text-decoration: none;
+  color: var(--mauve);
+  transition: color var(--transition-fast), background-color var(--transition-fast);
+  position: relative;
+}
+
+.tab-icon-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.tab-active-sparkle {
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  transform: translateX(-50%);
+  animation: tabSparklePulse 2s ease-in-out infinite;
+}
+
+@keyframes tabSparklePulse {
+  0%, 100% {
+    opacity: 0.7;
+    transform: translateX(-50%) scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1.15);
+  }
+}
+
+.tab-label {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  margin-top: 2px;
+}
+
+.tab-item:hover {
+  color: var(--ink);
+}
+
+.tab-item-active {
+  color: var(--rose-deep);
+}
+
+.tab-item-active .tab-label {
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab-active-sparkle {
+    animation: none !important;
+  }
+}

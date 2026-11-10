@@ -1,0 +1,41 @@
+:root {
+  /* Color tokens */
+  --bg: #F6EDEA;
+  --bg-deep: #EBD9D6;
+  --surface: #FBF6F3;
+  --surface-sunk: #F3E6E3;
+  --rose: #D9A5AE;
+  --rose-deep: #B8727F;
+  --mauve: #8E6B7A;
+  --ink: #4B3340;
+  --sage: #A9B29B;
+  --slate: #8C9BB5;
+  --lavender: #C9BBD6;
+  --gold: #D4B483;
+  --danger: #A8505E;
+
+  /* Typography */
+  --font-display: "Cormorant Garamond", Georgia, serif;
+  --font-body: "Lora", Georgia, serif;
+  --font-fallback: Georgia, serif;
+
+  --text-body-size: 17px;
+  --text-body-line-height: 1.55;
+
+  /* Radius */
+  --radius-card: 22px;
+  --radius-input: 18px;
+  --radius-button: 999px;
+  --radius-chip: 999px;
+
+  /* Shadows */
+  --shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 1px 2px rgba(75, 51, 64, 0.10), 0 10px 30px rgba(184, 114, 127, 0.14);
+  --shadow-input-sunk: inset 0 2px 4px rgba(75, 51, 64, 0.08);
+  --shadow-rose: 0 4px 14px rgba(184, 114, 127, 0.25);
+  --shadow-tabbar: 0 8px 32px rgba(75, 51, 64, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  --shadow-toast: 0 6px 20px rgba(75, 51, 64, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+
+  /* Transitions */
+  --transition-fast: 200ms ease-out;
+  --transition-base: 300ms ease-out;
+}
