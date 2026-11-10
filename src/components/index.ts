@@ -7,5 +7,6 @@ export * from './TabBar';
 export * from './Toast';
 export * from './Sparkles';
 export * from './WindowEditSheet';
+export * from './EntryEditSheet';
 export * from './ProtectedRoute';
 export * from './illustrations';

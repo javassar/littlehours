@@ -1,0 +1,84 @@
+.entry-edit-surface {
+  max-height: 85vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px 20px calc(36px + env(safe-area-inset-bottom, 0px)) 20px;
+}
+
+.entry-sheet-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.entry-sheet-header-trash {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background-color: rgba(168, 80, 94, 0.08);
+  border: 1px solid rgba(168, 80, 94, 0.3);
+  color: var(--danger);
+  border-radius: var(--radius-button);
+  padding: 6px 12px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), transform 100ms ease;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+.entry-sheet-header-trash:hover {
+  background-color: rgba(168, 80, 94, 0.16);
+}
+
+.entry-sheet-header-trash:active {
+  transform: translateY(1px);
+}
+
+.trash-label {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--danger);
+}
+
+.entry-edit-textarea {
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: var(--text-body-line-height);
+  color: var(--ink);
+  background-color: var(--surface-sunk);
+  box-shadow: var(--shadow-input-sunk);
+  border-radius: var(--radius-input);
+  border: 1px solid rgba(184, 114, 127, 0.25);
+  padding: 12px 14px;
+  resize: vertical;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.entry-delete-confirm-box {
+  background-color: rgba(168, 80, 94, 0.08);
+  border: 1px solid rgba(168, 80, 94, 0.3);
+  border-radius: 18px;
+  padding: 20px 16px;
+  text-align: center;
+  margin-top: 10px;
+}
+
+.entry-delete-confirm-text {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 22px;
+  color: var(--danger);
+  margin-bottom: 4px;
+}
+
+.entry-delete-confirm-sub {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--mauve);
+  margin-bottom: 20px;
+}

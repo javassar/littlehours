@@ -69,12 +69,13 @@
 /* Destructive Button */
 .btn-destructive {
   background-color: transparent;
-  border-color: transparent;
+  border-color: rgba(168, 80, 94, 0.35);
   color: var(--danger);
 }
 
 .btn-destructive:hover:not(:disabled) {
   background-color: rgba(168, 80, 94, 0.08);
+  border-color: var(--danger);
 }
 
 .btn-destructive:active:not(:disabled) {
