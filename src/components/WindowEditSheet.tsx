@@ -128,6 +128,7 @@ export const WindowEditSheet: React.FC<WindowEditSheetProps> = ({
               </label>
               <input
                 id="window-start-input"
+                name="window_start"
                 type="datetime-local"
                 className="sheet-datetime-input"
                 value={startVal}
@@ -155,6 +156,7 @@ export const WindowEditSheet: React.FC<WindowEditSheetProps> = ({
               </div>
               <input
                 id="window-end-input"
+                name="window_end"
                 type="datetime-local"
                 className="sheet-datetime-input"
                 value={endVal}

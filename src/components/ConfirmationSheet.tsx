@@ -1,0 +1,338 @@
+import React, { useState, useEffect } from 'react';
+import { Button } from './Button';
+import { Chip } from './Chip';
+import { SegmentItem } from './EntryEditSheet';
+import {
+  formatDuration,
+  toDateTimeLocalValue,
+  fromDateTimeLocalValue,
+} from '../lib/time';
+import './ConfirmationSheet.css';
+
+export interface ConfirmationSheetProps {
+  isOpen: boolean;
+  entryId: string;
+  rawText?: string;
+  initialSegments: SegmentItem[];
+  categories: string[];
+  timeZone?: string;
+  onClose: () => void;
+  onConfirm: (segments: SegmentItem[]) => Promise<void>;
+  onSaveUnconfirmed?: (segments: SegmentItem[]) => Promise<void>;
+}
+
+export const ConfirmationSheet: React.FC<ConfirmationSheetProps> = ({
+  isOpen,
+  rawText,
+  initialSegments,
+  categories,
+  onClose,
+  onConfirm,
+  onSaveUnconfirmed,
+}) => {
+  const [segments, setSegments] = useState<SegmentItem[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setSegments(
+        [...initialSegments].sort(
+          (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+        )
+      );
+    }
+  }, [isOpen, initialSegments]);
+
+  if (!isOpen) return null;
+
+  // 1. Edit activity label
+  const handleLabelChange = (index: number, newLabel: string) => {
+    setSegments((prev) => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], activity_label: newLabel };
+      return copy;
+    });
+  };
+
+  // 2. Edit category
+  const handleCategoryChange = (index: number, newCategory: string) => {
+    setSegments((prev) => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], category: newCategory };
+      return copy;
+    });
+  };
+
+  // 3. Edit start time of row i:
+  // If i > 0, also adjusts the previous row's end_time so the window stays fully covered without lost or doubled minutes.
+  const handleStartChange = (index: number, newLocalDtStr: string) => {
+    const newDate = fromDateTimeLocalValue(newLocalDtStr);
+    if (isNaN(newDate.getTime())) return;
+
+    const newIso = newDate.toISOString();
+    const newMs = newDate.getTime();
+
+    setSegments((prev) => {
+      if (index < 0 || index >= prev.length) return prev;
+      const currentEndMs = new Date(prev[index].end_time).getTime();
+
+      // Start must be before this segment's end
+      if (newMs >= currentEndMs) return prev;
+
+      const copy = [...prev];
+
+      if (index > 0) {
+        // If there's a previous row, new boundary must be after previous start
+        const prevStartMs = new Date(prev[index - 1].start_time).getTime();
+        if (newMs <= prevStartMs) return prev;
+
+        // Neighbor's end moves to match this row's start
+        copy[index - 1] = { ...copy[index - 1], end_time: newIso };
+      }
+
+      copy[index] = { ...copy[index], start_time: newIso };
+      return copy;
+    });
+  };
+
+  // 4. Edit end time of row i:
+  // If i < length - 1, also adjusts the next row's start_time so the window stays fully covered without lost or doubled minutes.
+  const handleEndChange = (index: number, newLocalDtStr: string) => {
+    const newDate = fromDateTimeLocalValue(newLocalDtStr);
+    if (isNaN(newDate.getTime())) return;
+
+    const newIso = newDate.toISOString();
+    const newMs = newDate.getTime();
+
+    setSegments((prev) => {
+      if (index < 0 || index >= prev.length) return prev;
+      const currentStartMs = new Date(prev[index].start_time).getTime();
+
+      // End must be after this segment's start
+      if (newMs <= currentStartMs) return prev;
+
+      const copy = [...prev];
+
+      if (index < prev.length - 1) {
+        // If there's a next row, new boundary must be before next row's end
+        const nextEndMs = new Date(prev[index + 1].end_time).getTime();
+        if (newMs >= nextEndMs) return prev;
+
+        // Neighbor's start moves to match this row's end
+        copy[index + 1] = { ...copy[index + 1], start_time: newIso };
+      }
+
+      copy[index] = { ...copy[index], end_time: newIso };
+      return copy;
+    });
+  };
+
+  // 5. Shared boundary divider change between segment i and i + 1
+  const handleBoundaryChange = (boundaryIndex: number, newLocalDtStr: string) => {
+    handleEndChange(boundaryIndex, newLocalDtStr);
+  };
+
+  // 6. "Looks right" sets confirmed = true and saves
+  const handleLooksRight = async () => {
+    setIsSaving(true);
+    try {
+      const confirmedSegments = segments.map((s) => ({ ...s, confirmed: true }));
+      await onConfirm(confirmedSegments);
+      onClose();
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // 7. Closing another way leaves segments saved but unconfirmed (confirmed = false)
+  const handleDismissUnconfirmed = async () => {
+    setIsSaving(true);
+    try {
+      if (onSaveUnconfirmed) {
+        const unconfirmedSegments = segments.map((s) => ({ ...s, confirmed: false }));
+        await onSaveUnconfirmed(unconfirmedSegments);
+      }
+      onClose();
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div
+      className="confirmation-sheet-backdrop"
+      onClick={handleDismissUnconfirmed}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Confirm time segments"
+    >
+      <div
+        className="confirmation-sheet-surface"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="confirmation-sheet-header">
+          <div className="confirmation-sheet-handle" />
+          <button
+            type="button"
+            className="confirmation-sheet-close"
+            onClick={handleDismissUnconfirmed}
+            aria-label="Close without confirming"
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+          <h2 className="confirmation-sheet-title">Review Segments</h2>
+          <p className="confirmation-sheet-subtitle">Double-check how your time was split</p>
+        </div>
+
+        {/* Scrollable list of rows */}
+        <div className="confirmation-sheet-body">
+          {rawText && (
+            <div className="confirmation-raw-text">
+              &ldquo;{rawText}&rdquo;
+            </div>
+          )}
+
+          {segments.map((seg, idx) => {
+            const start = new Date(seg.start_time);
+            const end = new Date(seg.end_time);
+            const durationStr = formatDuration(start, end);
+
+            return (
+              <React.Fragment key={seg.id || idx}>
+                <div className="confirmation-segment-card">
+                  {/* Row Time Range & Duration */}
+                  <div className="confirmation-time-row">
+                    <div className="confirmation-time-field">
+                      <label className="confirmation-field-label" htmlFor={`seg-start-${idx}`}>
+                        Start
+                      </label>
+                      <input
+                        id={`seg-start-${idx}`}
+                        name={`seg-start-${idx}`}
+                        type="datetime-local"
+                        className="confirmation-time-input"
+                        value={toDateTimeLocalValue(start)}
+                        onChange={(e) => handleStartChange(idx, e.target.value)}
+                        aria-label={`Start time for ${seg.activity_label}`}
+                      />
+                    </div>
+
+                    <span className="confirmation-time-arrow" aria-hidden="true">&rarr;</span>
+
+                    <div className="confirmation-time-field">
+                      <label className="confirmation-field-label" htmlFor={`seg-end-${idx}`}>
+                        End
+                      </label>
+                      <input
+                        id={`seg-end-${idx}`}
+                        name={`seg-end-${idx}`}
+                        type="datetime-local"
+                        className="confirmation-time-input"
+                        value={toDateTimeLocalValue(end)}
+                        onChange={(e) => handleEndChange(idx, e.target.value)}
+                        aria-label={`End time for ${seg.activity_label}`}
+                      />
+                    </div>
+
+                    <span className="confirmation-segment-duration">{durationStr}</span>
+                  </div>
+
+                  {/* Activity Label input */}
+                  <div className="confirmation-label-field">
+                    <label className="confirmation-field-label" htmlFor={`seg-label-${idx}`}>
+                      Activity
+                    </label>
+                    <input
+                      id={`seg-label-${idx}`}
+                      name={`seg-label-${idx}`}
+                      type="text"
+                      className="confirmation-label-input"
+                      value={seg.activity_label}
+                      onChange={(e) => handleLabelChange(idx, e.target.value)}
+                      placeholder="e.g. reading, lunch, emails"
+                    />
+                  </div>
+
+                  {/* Category Picker Row */}
+                  <div className="confirmation-category-row">
+                    <Chip label={seg.category} size="sm" />
+                    <select
+                      id={`seg-cat-${idx}`}
+                      name={`seg-cat-${idx}`}
+                      className="confirmation-category-select"
+                      value={seg.category}
+                      onChange={(e) => handleCategoryChange(idx, e.target.value)}
+                      aria-label={`Select category for ${seg.activity_label}`}
+                    >
+                      {categories.map((cat) => (
+                        <option key={cat} value={cat}>
+                          {cat}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Boundary connector between this row and the next row */}
+                {idx < segments.length - 1 && (
+                  <div className="confirmation-boundary-control">
+                    <div className="confirmation-boundary-line" />
+                    <div
+                      className="confirmation-boundary-badge"
+                      title="Boundary between activities: moving this adjusts both rows"
+                    >
+                      <span>Boundary:</span>
+                      <input
+                        id={`seg-boundary-${idx}`}
+                        name={`seg-boundary-${idx}`}
+                        type="datetime-local"
+                        className="confirmation-boundary-input"
+                        value={toDateTimeLocalValue(end)}
+                        onChange={(e) => handleBoundaryChange(idx, e.target.value)}
+                        aria-label={`Boundary between ${seg.activity_label} and ${segments[idx + 1]?.activity_label || 'next activity'}`}
+                      />
+                    </div>
+                    <div className="confirmation-boundary-line" />
+                  </div>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </div>
+
+        {/* Footer actions */}
+        <div className="confirmation-sheet-footer">
+          <Button
+            variant="primary"
+            fullWidth
+            onClick={handleLooksRight}
+            disabled={isSaving}
+          >
+            {isSaving ? 'Saving...' : 'Looks right'}
+          </Button>
+          <Button
+            variant="secondary"
+            fullWidth
+            onClick={handleDismissUnconfirmed}
+            disabled={isSaving}
+          >
+            Keep unchecked for now
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};

@@ -1,10 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Card, Button, SparkleBurst, Toast, WindowEditSheet } from '../components';
+import {
+  Card,
+  Button,
+  SparkleBurst,
+  Toast,
+  WindowEditSheet,
+  ConfirmationSheet,
+  SegmentItem,
+} from '../components';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { formatWindowSince, formatTime, formatDuration } from '../lib/time';
 import { enqueueEntry, getLatestWindowEnd, getQueue, subscribeToQueue } from '../lib/offlineQueue';
 import { parseEntryInBackground } from '../lib/parse';
+import { STARTER_CATEGORIES } from '../lib/settings';
 
 const DRAFT_STORAGE_KEY = 'littlehours_draft_entry';
 
@@ -32,7 +41,9 @@ const PencilIcon: React.FC = () => (
 );
 
 export const LogPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, settings } = useAuth();
+  const categories = settings?.categories || STARTER_CATEGORIES;
+  const timeZone = settings?.timezone || 'America/Phoenix';
 
   // Draft text in localStorage
   const [text, setText] = useState<string>(() => {
@@ -54,6 +65,14 @@ export const LogPage: React.FC = () => {
   const [sparkleActive, setSparkleActive] = useState(false);
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('Saved');
+
+  // Confirmation sheet state (Milestone 2.3)
+  const [confirmationEntry, setConfirmationEntry] = useState<{
+    id: string;
+    raw_text: string;
+    segments: SegmentItem[];
+  } | null>(null);
+  const [isConfirmationOpen, setIsConfirmationOpen] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -164,6 +183,74 @@ export const LogPage: React.FC = () => {
     setCustomWindow({ start: newStart, end: newEnd });
   };
 
+  // Poll for background AI parse completion to open confirmation sheet
+  const pollForParseCompletion = (id: string, entryRawText: string) => {
+    let attempts = 0;
+    const maxAttempts = 15; // up to ~30 seconds
+    const interval = setInterval(async () => {
+      attempts += 1;
+      if (attempts > maxAttempts) {
+        clearInterval(interval);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('entries')
+          .select(`
+            id,
+            parse_status,
+            clarification_question,
+            segments (
+              id,
+              entry_id,
+              start_time,
+              end_time,
+              activity_label,
+              category,
+              confirmed
+            )
+          `)
+          .eq('id', id)
+          .single();
+
+        if (error || !data) {
+          console.warn(`[Poll attempt ${attempts}] error:`, error?.message);
+          return;
+        }
+
+        console.log(`[Poll attempt ${attempts}] parse_status: ${data.parse_status}, segments: ${data.segments?.length || 0}`);
+
+        if (data.parse_status === 'parsed') {
+          clearInterval(interval);
+          if (Array.isArray(data.segments) && data.segments.length > 0) {
+            const sorted = [...data.segments].sort(
+              (a: any, b: any) =>
+                new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+            );
+            console.log('Opening Review Segments sheet with segments:', sorted);
+            setConfirmationEntry({
+              id: data.id,
+              raw_text: entryRawText,
+              segments: sorted,
+            });
+            setIsConfirmationOpen(true);
+          }
+        } else if (data.parse_status === 'needs_clarification') {
+          clearInterval(interval);
+          console.log('[Poll] Entry needs clarification:', data.clarification_question);
+          setToastMessage(`Needs clarification: ${data.clarification_question || 'See History'}`);
+          setToastVisible(true);
+        } else if (data.parse_status === 'failed') {
+          clearInterval(interval);
+          console.log('[Poll] Entry failed to parse:', data.clarification_question);
+        }
+      } catch (err) {
+        console.warn('[Poll] exception:', err);
+      }
+    }, 2000);
+  };
+
   // Save entry (handles both online save and offline queue)
   const handleSave = async () => {
     if (isSaving || !text.trim() || !user) return;
@@ -175,6 +262,13 @@ export const LogPage: React.FC = () => {
     const endToSave = customWindow ? customWindow.end : new Date();
     const entryId = crypto.randomUUID();
     const rawText = text.trim();
+
+    console.log('[Save] Saving entry with window:', {
+      start: startToSave.toISOString(),
+      end: endToSave.toISOString(),
+      durationMinutes: Math.round((endToSave.getTime() - startToSave.getTime()) / 60000),
+      rawText,
+    });
 
     const entryPayload = {
       id: entryId,
@@ -248,6 +342,8 @@ export const LogPage: React.FC = () => {
       finalizeSave(false);
       // Background AI parsing: saving never waits for it
       parseEntryInBackground(entryId);
+      // Listen for parse completion to show confirmation sheet
+      pollForParseCompletion(entryId, rawText);
     } catch {
       // Network exception during fetch
       await enqueueEntry(entryPayload);
@@ -255,6 +351,48 @@ export const LogPage: React.FC = () => {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleConfirmSegments = async (updatedSegments: SegmentItem[]) => {
+    if (!confirmationEntry) return;
+
+    for (const s of updatedSegments) {
+      await supabase
+        .from('segments')
+        .update({
+          activity_label: s.activity_label,
+          category: s.category,
+          start_time: s.start_time,
+          end_time: s.end_time,
+          confirmed: true,
+        })
+        .eq('id', s.id);
+    }
+
+    setToastMessage('Segments confirmed');
+    setToastVisible(true);
+    setIsConfirmationOpen(false);
+    setConfirmationEntry(null);
+  };
+
+  const handleSaveUnconfirmedSegments = async (updatedSegments: SegmentItem[]) => {
+    if (!confirmationEntry) return;
+
+    for (const s of updatedSegments) {
+      await supabase
+        .from('segments')
+        .update({
+          activity_label: s.activity_label,
+          category: s.category,
+          start_time: s.start_time,
+          end_time: s.end_time,
+          confirmed: false,
+        })
+        .eq('id', s.id);
+    }
+
+    setIsConfirmationOpen(false);
+    setConfirmationEntry(null);
   };
 
   return (
@@ -343,6 +481,24 @@ export const LogPage: React.FC = () => {
         currentEnd={currentEnd}
         onApply={handleApplyWindow}
       />
+
+      {/* Confirmation bottom sheet for newly parsed entry (Milestone 2.3) */}
+      {confirmationEntry && (
+        <ConfirmationSheet
+          isOpen={isConfirmationOpen}
+          entryId={confirmationEntry.id}
+          rawText={confirmationEntry.raw_text}
+          initialSegments={confirmationEntry.segments}
+          categories={categories}
+          timeZone={timeZone}
+          onClose={() => {
+            setIsConfirmationOpen(false);
+            setConfirmationEntry(null);
+          }}
+          onConfirm={handleConfirmSegments}
+          onSaveUnconfirmed={handleSaveUnconfirmedSegments}
+        />
+      )}
     </div>
   );
 };

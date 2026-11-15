@@ -134,51 +134,75 @@ Deno.serve(async (req: Request) => {
     }
 
     // Query Google AI Studio API for the live list of models enabled for this key
-    let candidateModels: string[] = [];
+    let availableModels: string[] = [];
     try {
-      const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+      const listRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
+        { signal: AbortSignal.timeout(5000) }
+      );
       if (listRes.ok) {
         const listData = await listRes.json();
-        const available = (listData.models || [])
-          .filter((m: any) => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
+        availableModels = (listData.models || [])
+          .filter(
+            (m: any) =>
+              Array.isArray(m.supportedGenerationMethods) &&
+              m.supportedGenerationMethods.includes('generateContent')
+          )
           .map((m: any) => m.name.replace(/^models\//, ''));
-        console.log('Available models from ListModels for this key:', available);
-
-        // Put preferred models first
-        if (available.length > 0) {
-          if (configuredModel && available.includes(configuredModel)) {
-            candidateModels.push(configuredModel);
-          }
-          // Add Flash models
-          const flashModels = available.filter((m: string) => m.toLowerCase().includes('flash'));
-          candidateModels.push(...flashModels);
-          // Add other remaining models
-          candidateModels.push(...available);
-        }
+        console.log('Available models from ListModels for this key:', availableModels);
       } else {
         const listErrText = await listRes.text();
         console.warn(`ListModels returned status ${listRes.status}:`, listErrText);
       }
     } catch (listErr) {
-      console.warn('Error querying ListModels:', listErr);
+      console.warn('Error or timeout querying ListModels:', listErr);
     }
 
-    // Fallback model list if ListModels was empty
+    // Filter to standard text generation Flash models only.
+    // Exclude specialized / experimental audio, TTS, vision-only, and embedding models.
+    const cleanFlashModels = availableModels.filter((m: string) => {
+      const lower = m.toLowerCase();
+      return (
+        lower.includes('flash') &&
+        !lower.includes('tts') &&
+        !lower.includes('audio') &&
+        !lower.includes('preview') &&
+        !lower.includes('embed') &&
+        !lower.includes('imagen') &&
+        !lower.includes('realtime')
+      );
+    });
+
+    // Priority order:
+    // When Google's standard Flash servers experience high demand spikes (503),
+    // Google's Lite Flash models (gemini-2.5-flash-lite, gemini-flash-lite-latest, gemini-3.1-flash-lite)
+    // have dedicated high capacity and respond instantly without high-demand errors.
+    const priorityOrder = [
+      'gemini-2.5-flash-lite',
+      'gemini-flash-lite-latest',
+      'gemini-3.1-flash-lite',
+      'gemini-2.5-flash',
+      'gemini-flash-latest',
+      configuredModel,
+    ].filter(Boolean);
+
+    let candidateModels: string[] = [];
+    for (const p of priorityOrder) {
+      if (cleanFlashModels.includes(p)) {
+        candidateModels.push(p);
+      }
+    }
+    // Add any other clean Flash models as backup
+    candidateModels.push(...cleanFlashModels);
+
+    // Fallback if ListModels was empty
     if (candidateModels.length === 0) {
-      candidateModels = [
-        configuredModel || 'gemini-2.5-flash',
-        'gemini-2.5-flash',
-        'gemini-2.0-flash',
-        'gemini-1.5-flash',
-        'gemini-1.5-flash-latest',
-        'gemini-1.5-pro',
-        'gemini-pro',
-      ];
+      candidateModels = ['gemini-2.5-flash-lite', 'gemini-flash-lite-latest', 'gemini-2.5-flash'];
     }
 
-    // Remove duplicates and empty strings
-    candidateModels = Array.from(new Set(candidateModels.filter(Boolean)));
-    console.log('Final candidate models to attempt:', candidateModels);
+    // Try up to 3 models (503 errors return in ~200ms so trying 3 models takes under 1s if one is busy)
+    candidateModels = Array.from(new Set(candidateModels.filter(Boolean))).slice(0, 3);
+    console.log('Candidate models to attempt (max 3):', candidateModels);
 
     const initialUserPayload = {
       raw_text: entry.raw_text,
@@ -254,6 +278,7 @@ Deno.serve(async (req: Request) => {
             'x-goog-api-key': apiKey,
           },
           body: JSON.stringify(reqBody),
+          signal: AbortSignal.timeout(20000),
         });
 
         if (res.ok) {
@@ -270,6 +295,11 @@ Deno.serve(async (req: Request) => {
         lastErrorText = `Model ${m} returned ${res.status}: ${errText}`;
         console.warn(lastErrorText);
 
+        // Immediate stop on quota / rate limit (429) - retrying other models won't help
+        if (res.status === 429) {
+          throw new Error('Google Gemini rate limit reached (free tier quota). Please wait a few seconds and tap Try again.');
+        }
+
         // If it's a 400 or 403 API key issue, don't keep retrying other models
         if (res.status === 400 && errText.includes('API_KEY_INVALID')) {
           throw new Error('API key not valid. Please check your GEMINI_API_KEY secret.');
@@ -279,7 +309,8 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      throw new Error(`All candidate models failed. Last error: ${lastErrorText}`);
+      const availableSnippet = (cleanFlashModels.length > 0 ? cleanFlashModels : availableModels).slice(0, 6).join(', ');
+      throw new Error(`Models attempted: [${candidateModels.join(', ')}]. Available on key: [${availableSnippet}]. Last error: ${lastErrorText}`);
     };
 
     // Contents sequence for multi-turn retry if needed

@@ -2,7 +2,7 @@
  * Milestone 2.2: Background AI parsing triggers and helpers
  */
 
-import { supabase } from './supabase';
+import { supabase } from './supabase.ts';
 
 /**
  * Triggers the parse-entry Edge Function in the background.
@@ -25,12 +25,17 @@ export async function parseEntryInBackground(entryId: string): Promise<void> {
 
     if (error) {
       console.warn(`parse-entry returned error for ${entryId}:`, error.message);
-      // Mark as failed in DB if possible so UI shows "Try again"
+      // Mark as failed in DB with friendly explanation so UI shows "Try again"
+      const friendlyMsg =
+        error.message?.includes('non-2xx') || error.message?.includes('546')
+          ? 'AI service was temporarily busy. Tap Try again in a moment.'
+          : error.message;
+
       await supabase
         .from('entries')
         .update({
           parse_status: 'failed',
-          clarification_question: error.message,
+          clarification_question: friendlyMsg,
           updated_at: new Date().toISOString(),
         })
         .eq('id', entryId);

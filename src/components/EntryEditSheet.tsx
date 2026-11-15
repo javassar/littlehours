@@ -260,6 +260,7 @@ export const EntryEditSheet: React.FC<EntryEditSheetProps> = ({
               </label>
               <textarea
                 id="entry-edit-text"
+                name="raw_text"
                 className="time-log-textarea entry-edit-textarea"
                 rows={4}
                 value={text}
@@ -276,6 +277,7 @@ export const EntryEditSheet: React.FC<EntryEditSheetProps> = ({
               </label>
               <input
                 id="entry-edit-start"
+                name="window_start"
                 type="datetime-local"
                 className="sheet-datetime-input"
                 value={startVal}
@@ -296,6 +298,7 @@ export const EntryEditSheet: React.FC<EntryEditSheetProps> = ({
               </label>
               <input
                 id="entry-edit-end"
+                name="window_end"
                 type="datetime-local"
                 className="sheet-datetime-input"
                 value={endVal}

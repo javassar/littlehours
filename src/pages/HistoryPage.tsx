@@ -5,14 +5,16 @@ import {
   Deer,
   Toast,
   EntryEditSheet,
+  ConfirmationSheet,
   RotatingSparkle,
   EntryItem,
+  SegmentItem,
   TrashIcon,
   Chip,
 } from '../components';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
-import { retryParseEntry } from '../lib/parse';
+import { retryParseEntry, parseEntryInBackground } from '../lib/parse';
 import {
   formatTimeRange,
   formatDuration,
@@ -44,6 +46,10 @@ export const HistoryPage: React.FC = () => {
   // Edit sheet state
   const [selectedEntry, setSelectedEntry] = useState<EntryItem | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
+
+  // Confirmation sheet state (Milestone 2.3)
+  const [selectedConfirmationEntry, setSelectedConfirmationEntry] = useState<EntryItem | null>(null);
+  const [isConfirmationOpen, setIsConfirmationOpen] = useState(false);
 
   // Direct card delete confirmation dialog state
   const [entryToDelete, setEntryToDelete] = useState<EntryItem | null>(null);
@@ -116,6 +122,7 @@ export const HistoryPage: React.FC = () => {
               )
             : [],
         })) as EntryItem[];
+        console.log('History entries loaded from Supabase:', newRows);
         setHasMore(newRows.length === PAGE_SIZE);
 
         if (fromOffset === 0) {
@@ -249,6 +256,7 @@ export const HistoryPage: React.FC = () => {
         raw_text: updated.raw_text,
         window_start: updated.window_start,
         window_end: updated.window_end,
+        parse_status: 'pending',
         updated_at: new Date().toISOString(),
       })
       .eq('id', id);
@@ -258,9 +266,12 @@ export const HistoryPage: React.FC = () => {
     }
 
     setEntries((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...updated } : item))
+      prev.map((item) =>
+        item.id === id ? { ...item, ...updated, parse_status: 'pending' } : item
+      )
     );
-    showToast('Changes saved');
+    showToast('Changes saved. Re-reading entry...');
+    parseEntryInBackground(id);
   };
 
   // Handle entry delete (supports both queued offline and synced entries)
@@ -284,10 +295,62 @@ export const HistoryPage: React.FC = () => {
     showToast('Entry deleted');
   };
 
-  // Open edit sheet
+  // Open edit sheet or confirmation sheet
   const handleCardClick = (entry: EntryItem) => {
+    if (entry.segments && entry.segments.length > 0) {
+      setSelectedConfirmationEntry(entry);
+      setIsConfirmationOpen(true);
+      return;
+    }
     setSelectedEntry(entry);
     setIsEditOpen(true);
+  };
+
+  const handleConfirmSegments = async (updatedSegments: SegmentItem[]) => {
+    if (!selectedConfirmationEntry) return;
+
+    for (const s of updatedSegments) {
+      await supabase
+        .from('segments')
+        .update({
+          activity_label: s.activity_label,
+          category: s.category,
+          start_time: s.start_time,
+          end_time: s.end_time,
+          confirmed: true,
+        })
+        .eq('id', s.id);
+    }
+
+    setEntries((prev) =>
+      prev.map((e) =>
+        e.id === selectedConfirmationEntry.id ? { ...e, segments: updatedSegments } : e
+      )
+    );
+    showToast('Segments confirmed');
+  };
+
+  const handleSaveUnconfirmedSegments = async (updatedSegments: SegmentItem[]) => {
+    if (!selectedConfirmationEntry) return;
+
+    for (const s of updatedSegments) {
+      await supabase
+        .from('segments')
+        .update({
+          activity_label: s.activity_label,
+          category: s.category,
+          start_time: s.start_time,
+          end_time: s.end_time,
+          confirmed: false,
+        })
+        .eq('id', s.id);
+    }
+
+    setEntries((prev) =>
+      prev.map((e) =>
+        e.id === selectedConfirmationEntry.id ? { ...e, segments: updatedSegments } : e
+      )
+    );
   };
 
   if (loading) {
@@ -461,6 +524,21 @@ export const HistoryPage: React.FC = () => {
 
                       <div className="history-card-header-actions">
                         <span className="history-duration-badge">{durationStr}</span>
+                        {entry.segments &&
+                          entry.segments.length > 0 &&
+                          entry.segments.some((s) => !s.confirmed) && (
+                            <span
+                              className="history-unchecked-badge"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedConfirmationEntry(entry);
+                                setIsConfirmationOpen(true);
+                              }}
+                              title="Unconfirmed segments: click to review"
+                            >
+                              Unchecked
+                            </span>
+                          )}
                         <button
                           type="button"
                           className="history-card-trash-btn"
@@ -503,6 +581,33 @@ export const HistoryPage: React.FC = () => {
                           onClick={() => handleRetryParse(entry.id)}
                         >
                           Try again
+                        </button>
+                      </div>
+                    )}
+
+                    {/* 2.5 Clarification question state */}
+                    {entry.parse_status === 'needs_clarification' && entry.clarification_question && (
+                      <div
+                        className="history-card-clarification"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 10,
+                          marginTop: 6,
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <span style={{ fontStyle: 'italic', color: 'var(--mauve)', fontSize: 13, flex: 1 }}>
+                          {entry.clarification_question}
+                        </span>
+                        <button
+                          type="button"
+                          className="history-retry-btn"
+                          onClick={() => handleRetryParse(entry.id)}
+                          aria-label="Re-evaluate entry with AI"
+                        >
+                          Re-read
                         </button>
                       </div>
                     )}
@@ -606,6 +711,39 @@ export const HistoryPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Confirmation sheet for segments (Milestone 2.3) */}
+      <ConfirmationSheet
+        isOpen={isConfirmationOpen}
+        entryId={selectedConfirmationEntry?.id || ''}
+        rawText={selectedConfirmationEntry?.raw_text}
+        initialSegments={selectedConfirmationEntry?.segments || []}
+        categories={
+          settings?.categories || [
+            'work',
+            'job search',
+            'phone and social media',
+            'sleep',
+            'exercise',
+            'meals',
+            'chores',
+            'social time',
+            'reading',
+            'entertainment',
+            'travel',
+            'personal care',
+            'errands',
+            'rest',
+          ]
+        }
+        timeZone={timeZone}
+        onClose={() => {
+          setIsConfirmationOpen(false);
+          setSelectedConfirmationEntry(null);
+        }}
+        onConfirm={handleConfirmSegments}
+        onSaveUnconfirmed={handleSaveUnconfirmedSegments}
+      />
 
       {/* Edit & Delete sheet */}
       <EntryEditSheet

@@ -1,0 +1,291 @@
+.confirmation-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(75, 51, 64, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 2000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: confirmBackdropFadeIn var(--transition-fast) forwards;
+}
+
+@keyframes confirmBackdropFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.confirmation-sheet-surface {
+  width: 100%;
+  max-width: 480px;
+  max-height: 88vh;
+  background-color: var(--surface);
+  border-top-left-radius: 26px;
+  border-top-right-radius: 26px;
+  box-shadow: 0 -4px 30px rgba(75, 51, 64, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  border-top: 1px solid rgba(184, 114, 127, 0.25);
+  display: flex;
+  flex-direction: column;
+  animation: confirmSheetSlideUp var(--transition-base) forwards;
+  box-sizing: border-box;
+}
+
+@keyframes confirmSheetSlideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.confirmation-sheet-header {
+  padding: 16px 20px 10px 20px;
+  border-bottom: 1px solid rgba(184, 114, 127, 0.15);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.confirmation-sheet-handle {
+  width: 40px;
+  height: 4px;
+  background-color: var(--mauve);
+  opacity: 0.35;
+  border-radius: 999px;
+  margin: 0 auto 12px auto;
+}
+
+.confirmation-sheet-close {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  background: transparent;
+  border: none;
+  color: var(--mauve);
+  padding: 6px;
+  cursor: pointer;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 150ms ease;
+}
+
+.confirmation-sheet-close:hover {
+  opacity: 0.7;
+}
+
+.confirmation-sheet-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 22px;
+  color: var(--ink);
+  text-align: center;
+  margin: 0 0 2px 0;
+}
+
+.confirmation-sheet-subtitle {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 15px;
+  color: var(--mauve);
+  text-align: center;
+  margin: 0;
+}
+
+.confirmation-sheet-body {
+  padding: 16px 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
+/* Raw text quote */
+.confirmation-raw-text {
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink);
+  background-color: var(--surface-sunk);
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(184, 114, 127, 0.15);
+  font-style: italic;
+  margin-bottom: 4px;
+}
+
+/* Individual segment card */
+.confirmation-segment-card {
+  background-color: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(184, 114, 127, 0.25);
+  border-radius: 16px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 1px 4px rgba(75, 51, 64, 0.05);
+}
+
+/* Start and End time row */
+.confirmation-time-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.confirmation-time-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.confirmation-time-arrow {
+  color: var(--mauve);
+  font-size: 14px;
+  padding-bottom: 6px;
+  user-select: none;
+}
+
+.confirmation-time-input {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--ink);
+  background-color: var(--surface-sunk);
+  border: 1px solid rgba(184, 114, 127, 0.25);
+  border-radius: 10px;
+  padding: 4px 6px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.confirmation-time-input:focus {
+  outline: 2px solid var(--gold);
+  border-color: var(--rose-deep);
+}
+
+.confirmation-segment-duration {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--mauve);
+  background-color: rgba(217, 165, 174, 0.22);
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-bottom: 4px;
+  flex-shrink: 0;
+}
+
+/* Activity Label Input */
+.confirmation-label-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.confirmation-field-label {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--mauve);
+  font-weight: 500;
+}
+
+.confirmation-label-input {
+  font-family: var(--font-body);
+  font-size: 16px; /* stops iPhone zoom */
+  line-height: 1.4;
+  color: var(--ink);
+  background-color: var(--surface-sunk);
+  border: 1px solid rgba(184, 114, 127, 0.25);
+  border-radius: 12px;
+  padding: 8px 12px;
+  box-shadow: inset 0 1px 3px rgba(75, 51, 64, 0.08);
+  transition: border-color var(--transition-fast);
+}
+
+.confirmation-label-input:focus {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  border-color: var(--rose-deep);
+}
+
+/* Category Picker Row */
+.confirmation-category-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.confirmation-category-select {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--ink);
+  background-color: var(--surface-sunk);
+  border: 1px solid rgba(184, 114, 127, 0.3);
+  border-radius: 999px;
+  padding: 4px 10px;
+  cursor: pointer;
+  max-width: 180px;
+}
+
+.confirmation-category-select:focus {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* Shared Boundary Adjustment Control */
+.confirmation-boundary-control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 4px 0;
+  margin: -2px 0;
+  position: relative;
+}
+
+.confirmation-boundary-line {
+  flex: 1;
+  border-bottom: 1px dashed rgba(184, 114, 127, 0.4);
+}
+
+.confirmation-boundary-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--surface);
+  border: 1px solid rgba(184, 114, 127, 0.35);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--mauve);
+  box-shadow: 0 1px 3px rgba(75, 51, 64, 0.05);
+}
+
+.confirmation-boundary-input {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--ink);
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  accent-color: var(--rose-deep);
+}
+
+.confirmation-boundary-input:focus {
+  outline: 2px solid var(--gold);
+  border-radius: 4px;
+}
+
+/* Footer Actions */
+.confirmation-sheet-footer {
+  padding: 12px 20px calc(24px + env(safe-area-inset-bottom, 0px)) 20px;
+  border-top: 1px solid rgba(184, 114, 127, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}

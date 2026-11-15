@@ -13,23 +13,30 @@ export const Toast: React.FC<ToastProps> = ({
   message = 'Saved',
   visible,
   onClose,
-  durationMs = 2000,
+  durationMs,
 }) => {
+  // Give enough time to read based on message length (min 3.5s, up to 8s for long questions)
+  const effectiveDuration = durationMs ?? Math.max(3500, Math.min(8000, (message?.length || 0) * 85));
+
   useEffect(() => {
     if (!visible || !onClose) return;
 
     const timer = window.setTimeout(() => {
       onClose();
-    }, durationMs);
+    }, effectiveDuration);
 
     return () => clearTimeout(timer);
-  }, [visible, onClose, durationMs]);
+  }, [visible, onClose, effectiveDuration]);
 
   if (!visible) return null;
 
   return (
     <div className="toast-portal" role="status" aria-live="polite">
-      <div className="toast-pill">
+      <div
+        className="toast-pill"
+        onClick={onClose}
+        title="Tap to dismiss"
+      >
         <Sparkle size={14} color="var(--gold)" />
         <span className="toast-message">{message}</span>
       </div>
