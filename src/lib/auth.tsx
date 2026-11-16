@@ -10,6 +10,7 @@ interface AuthContextType {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
+  refreshSettings: () => Promise<void>;
   isConfigured: boolean;
 }
 
@@ -104,6 +105,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const refreshSettings = async () => {
+    if (user) {
+      const userSettings = await ensureUserSettings(user.id);
+      if (userSettings) setSettings(userSettings);
+    }
+  };
+
   const signOut = async () => {
     if (!isSupabaseConfigured) {
       setSession(null);
@@ -126,6 +134,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading,
         signIn,
         signOut,
+        refreshSettings,
         isConfigured: isSupabaseConfigured,
       }}
     >

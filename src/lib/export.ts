@@ -2,21 +2,40 @@
  * Export helpers for Little Hours (CSV & JSON)
  */
 
+export interface ExportSegment {
+  id?: string;
+  start_time: string;
+  end_time: string;
+  activity_label: string;
+  category: string;
+  confirmed?: boolean;
+}
+
 export interface ExportEntry {
   id: string;
   window_start: string;
   window_end: string;
   raw_text: string;
   created_at: string;
+  follow_ups?: any[];
+  segments?: ExportSegment[];
 }
 
 export interface FormattedExportRow {
   id: string;
+  entry_id: string;
+  segment_id?: string;
+  start_time?: string;
+  end_time?: string;
   window_start: string;
   window_end: string;
   local_start: string;
   local_end: string;
+  activity_label?: string;
+  category?: string;
+  confirmed?: string;
   raw_text: string;
+  follow_ups?: string;
   created_at: string;
 }
 
@@ -70,51 +89,137 @@ export function formatLocalTime(date: Date, timeZone: string = 'America/Phoenix'
 }
 
 /**
- * Transform raw entries into exportable rows with local times.
+ * Transform raw entries into exportable rows with local times and segment details (Milestone 2.6).
+ * Produces one row per segment when segments exist.
  */
 export function prepareExportRows(
   entries: ExportEntry[],
   timeZone: string = 'America/Phoenix'
 ): FormattedExportRow[] {
-  return entries.map((entry) => {
-    const start = new Date(entry.window_start);
-    const end = new Date(entry.window_end);
+  const rows: FormattedExportRow[] = [];
 
-    return {
-      id: entry.id,
-      window_start: entry.window_start,
-      window_end: entry.window_end,
-      local_start: formatLocalTime(start, timeZone),
-      local_end: formatLocalTime(end, timeZone),
-      raw_text: entry.raw_text,
-      created_at: entry.created_at,
-    };
-  });
+  for (const entry of entries) {
+    const followUpsStr =
+      entry.follow_ups && entry.follow_ups.length > 0
+        ? JSON.stringify(entry.follow_ups)
+        : '';
+
+    if (entry.segments && entry.segments.length > 0) {
+      for (const seg of entry.segments) {
+        const segStart = new Date(seg.start_time);
+        const segEnd = new Date(seg.end_time);
+
+        rows.push({
+          id: entry.id,
+          entry_id: entry.id,
+          segment_id: seg.id || '',
+          start_time: seg.start_time,
+          end_time: seg.end_time,
+          window_start: entry.window_start,
+          window_end: entry.window_end,
+          local_start: formatLocalTime(segStart, timeZone),
+          local_end: formatLocalTime(segEnd, timeZone),
+          activity_label: seg.activity_label,
+          category: seg.category,
+          confirmed: seg.confirmed ? 'true' : 'false',
+          raw_text: entry.raw_text,
+          follow_ups: followUpsStr,
+          created_at: entry.created_at,
+        });
+      }
+    } else {
+      const winStart = new Date(entry.window_start);
+      const winEnd = new Date(entry.window_end);
+
+      rows.push({
+        id: entry.id,
+        entry_id: entry.id,
+        segment_id: '',
+        start_time: entry.window_start,
+        end_time: entry.window_end,
+        window_start: entry.window_start,
+        window_end: entry.window_end,
+        local_start: formatLocalTime(winStart, timeZone),
+        local_end: formatLocalTime(winEnd, timeZone),
+        activity_label: '',
+        category: '',
+        confirmed: 'false',
+        raw_text: entry.raw_text,
+        follow_ups: followUpsStr,
+        created_at: entry.created_at,
+      });
+    }
+  }
+
+  return rows;
 }
 
 /**
  * Generate CSV string from export rows.
+ * Supports both updated segment-level export (Milestone 2.6) and entry-level format.
  */
 export function generateCSV(rows: FormattedExportRow[]): string {
+  const isSegmentExport =
+    rows.length > 0 &&
+    rows.some((r) => r.segment_id !== undefined && r.activity_label !== undefined && (r.segment_id !== '' || r.activity_label !== ''));
+
+  if (!isSegmentExport) {
+    const headers = [
+      'id',
+      'window_start',
+      'window_end',
+      'local_start',
+      'local_end',
+      'raw_text',
+      'created_at',
+    ];
+
+    const headerLine = headers.map(escapeCSVCell).join(',');
+    const rowLines = rows.map((row) =>
+      [
+        escapeCSVCell(row.id),
+        escapeCSVCell(row.window_start),
+        escapeCSVCell(row.window_end),
+        escapeCSVCell(row.local_start),
+        escapeCSVCell(row.local_end),
+        escapeCSVCell(row.raw_text),
+        escapeCSVCell(row.created_at),
+      ].join(',')
+    );
+
+    return [headerLine, ...rowLines].join('\r\n');
+  }
+
+  // Milestone 2.6 segment-level headers
   const headers = [
-    'id',
-    'window_start',
-    'window_end',
+    'entry_id',
+    'segment_id',
+    'start_time',
+    'end_time',
     'local_start',
     'local_end',
+    'activity_label',
+    'category',
+    'confirmed',
     'raw_text',
+    'follow_ups',
     'created_at',
   ];
 
   const headerLine = headers.map(escapeCSVCell).join(',');
   const rowLines = rows.map((row) =>
     [
-      escapeCSVCell(row.id),
-      escapeCSVCell(row.window_start),
-      escapeCSVCell(row.window_end),
+      escapeCSVCell(row.entry_id),
+      escapeCSVCell(row.segment_id || ''),
+      escapeCSVCell(row.start_time || row.window_start),
+      escapeCSVCell(row.end_time || row.window_end),
       escapeCSVCell(row.local_start),
       escapeCSVCell(row.local_end),
+      escapeCSVCell(row.activity_label || ''),
+      escapeCSVCell(row.category || ''),
+      escapeCSVCell(row.confirmed || 'false'),
       escapeCSVCell(row.raw_text),
+      escapeCSVCell(row.follow_ups || ''),
       escapeCSVCell(row.created_at),
     ].join(',')
   );

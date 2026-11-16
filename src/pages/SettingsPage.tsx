@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Button, Hummingbird, Chip, Toast } from '../components';
+import { Card, Button, Hummingbird, Chip, Toast, CategoriesSheet } from '../components';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import {
@@ -12,11 +12,54 @@ import {
   ExportEntry,
 } from '../lib/export';
 import { getQueue } from '../lib/offlineQueue';
+import { STARTER_CATEGORIES, getPromptVersionStats } from '../lib/settings';
 
 export const SettingsPage: React.FC = () => {
-  const { user, settings, signOut } = useAuth();
+  const { user, settings, signOut, refreshSettings } = useAuth();
   const navigate = useNavigate();
   const timeZone = settings?.timezone || 'America/Phoenix';
+
+  // Categories management
+  const [categoriesSheetOpen, setCategoriesSheetOpen] = useState(false);
+  const [categories, setCategories] = useState<string[]>(
+    settings?.categories && settings.categories.length > 0
+      ? settings.categories
+      : STARTER_CATEGORIES
+  );
+
+  useEffect(() => {
+    if (settings?.categories && settings.categories.length > 0) {
+      setCategories(settings.categories);
+    }
+  }, [settings?.categories]);
+
+  // Prompt version stats
+  const [promptStats, setPromptStats] = useState<Record<string, number>>({});
+
+  const fetchPromptStats = async () => {
+    if (!user) return;
+    try {
+      const stats = await getPromptVersionStats(user.id);
+      setPromptStats(stats);
+    } catch (err) {
+      console.warn('Could not fetch prompt version stats:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchPromptStats();
+  }, [user?.id]);
+
+  // Re-read entries state
+  const [includeConfirmed, setIncludeConfirmed] = useState(false);
+  const [isReReading, setIsReReading] = useState(false);
+  const [reReadProgress, setReReadProgress] = useState<{
+    current: number;
+    total: number;
+    percent: number;
+  } | null>(null);
+  const [reReadStatusText, setReReadStatusText] = useState<string | null>(null);
+  const stopReReadRef = useRef(false);
 
   // Date range filter for export (optional, defaults to all)
   const [fromDate, setFromDate] = useState('');
@@ -38,12 +81,130 @@ export const SettingsPage: React.FC = () => {
     navigate('/login', { replace: true });
   };
 
+  const handleCategoriesUpdated = (newCats: string[]) => {
+    setCategories(newCats);
+    if (refreshSettings) {
+      refreshSettings();
+    }
+  };
+
+  const handleReReadAllEntries = async () => {
+    if (!user) return;
+    setIsReReading(true);
+    setReReadStatusText(null);
+    stopReReadRef.current = false;
+
+    try {
+      const { data: entries, error } = await supabase
+        .from('entries')
+        .select('id, window_start, segments(id, confirmed)')
+        .eq('user_id', user.id)
+        .order('window_start', { ascending: true });
+
+      if (error) {
+        throw new Error(`Failed to load entries: ${error.message}`);
+      }
+
+      if (!entries || entries.length === 0) {
+        setReReadStatusText('No entries found to re-read.');
+        setIsReReading(false);
+        return;
+      }
+
+      // Filter entries based on includeConfirmed
+      const toProcess = entries.filter((entry) => {
+        if (includeConfirmed) return true;
+        const segs = (entry as any).segments || [];
+        if (segs.length === 0) return true;
+        const allConfirmed = segs.every((s: any) => s.confirmed);
+        return !allConfirmed;
+      });
+
+      if (toProcess.length === 0) {
+        setReReadStatusText(
+          'All entries have confirmed segments. Turn on "Include confirmed segments" to re-read anyway.'
+        );
+        setIsReReading(false);
+        return;
+      }
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) {
+        throw new Error('Not logged in. Please sign in again.');
+      }
+
+      let processedCount = 0;
+      let failedCount = 0;
+
+      for (let i = 0; i < toProcess.length; i++) {
+        if (stopReReadRef.current) {
+          setReReadStatusText(`Stopped after ${processedCount} entries.`);
+          break;
+        }
+
+        const entry = toProcess[i];
+        setReReadProgress({
+          current: i + 1,
+          total: toProcess.length,
+          percent: Math.round(((i + 1) / toProcess.length) * 100),
+        });
+
+        try {
+          const { error: invokeErr } = await supabase.functions.invoke('parse-entry', {
+            body: { entry_id: entry.id },
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          if (invokeErr) {
+            failedCount++;
+            console.warn(`Failed to re-read entry ${entry.id}:`, invokeErr.message);
+          } else {
+            processedCount++;
+          }
+        } catch (err) {
+          failedCount++;
+          console.warn(`Exception re-reading entry ${entry.id}:`, err);
+        }
+
+        // If there's another entry, pause 4.2 seconds to stay safely inside free tier 15 RPM
+        if (i < toProcess.length - 1 && !stopReReadRef.current) {
+          await new Promise((resolve) => setTimeout(resolve, 4200));
+        }
+      }
+
+      if (!stopReReadRef.current) {
+        const summary = `Re-read finished: ${processedCount} entry/entries updated${
+          failedCount > 0 ? `, ${failedCount} failed` : ''
+        }.`;
+        setReReadStatusText(summary);
+        showToast(`Re-read ${processedCount} entries`);
+      }
+
+      await fetchPromptStats();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      setReReadStatusText(`Re-read failed: ${msg}`);
+    } finally {
+      setIsReReading(false);
+      setReReadProgress(null);
+    }
+  };
+
+  const handleStopReRead = () => {
+    stopReReadRef.current = true;
+  };
+
   const fetchExportEntries = async (): Promise<ExportEntry[]> => {
     if (!user) return [];
 
     let query = supabase
       .from('entries')
-      .select('id, window_start, window_end, raw_text, created_at')
+      .select(
+        'id, window_start, window_end, raw_text, created_at, follow_ups, segments(id, start_time, end_time, activity_label, category, confirmed)'
+      )
       .eq('user_id', user.id)
       .order('window_start', { ascending: true });
 
@@ -62,14 +223,23 @@ export const SettingsPage: React.FC = () => {
       throw new Error(error.message);
     }
 
-    const serverEntries = (data || []) as ExportEntry[];
+    const serverEntries = (data || []).map((e: any) => {
+      const segs = Array.isArray(e.segments)
+        ? [...e.segments].sort(
+            (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
+          )
+        : [];
+      return {
+        ...e,
+        segments: segs,
+      };
+    }) as ExportEntry[];
 
     // Also include any matching queued offline entries
     try {
       const queue = await getQueue();
       const userQueue = queue.filter((e) => e.user_id === user.id);
       for (const qEntry of userQueue) {
-        // If not already in serverEntries
         if (!serverEntries.some((s) => s.id === qEntry.id)) {
           let match = true;
           if (fromDate) {
@@ -85,6 +255,7 @@ export const SettingsPage: React.FC = () => {
               window_end: qEntry.window_end,
               raw_text: qEntry.raw_text,
               created_at: qEntry.created_at || qEntry.queued_at,
+              segments: [],
             });
           }
         }
@@ -93,8 +264,9 @@ export const SettingsPage: React.FC = () => {
       console.warn('Could not read offline queue for export:', e);
     }
 
-    // Sort chronologically ascending
-    serverEntries.sort((a, b) => new Date(a.window_start).getTime() - new Date(b.window_start).getTime());
+    serverEntries.sort(
+      (a, b) => new Date(a.window_start).getTime() - new Date(b.window_start).getTime()
+    );
     return serverEntries;
   };
 
@@ -118,11 +290,11 @@ export const SettingsPage: React.FC = () => {
       if (format === 'csv') {
         const csvContent = generateCSV(rows);
         downloadFile(csvContent, filename, 'text/csv;charset=utf-8;');
-        showToast(`Exported ${rows.length} entries to CSV`);
+        showToast(`Exported ${rows.length} segment(s) to CSV`);
       } else {
         const jsonContent = generateJSON(rows);
         downloadFile(jsonContent, filename, 'application/json;charset=utf-8;');
-        showToast(`Exported ${rows.length} entries to JSON`);
+        showToast(`Exported ${rows.length} segment(s) to JSON`);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
@@ -138,6 +310,13 @@ export const SettingsPage: React.FC = () => {
     setToDate('');
     setExportStatus(null);
   };
+
+  // Sort prompt versions so 'v2' comes first
+  const sortedPromptVersions = Object.keys(promptStats).sort((a, b) => {
+    if (a === 'v2') return -1;
+    if (b === 'v2') return 1;
+    return a.localeCompare(b);
+  });
 
   return (
     <div className="page-container screen-fade-in settings-page">
@@ -156,11 +335,135 @@ export const SettingsPage: React.FC = () => {
         </Button>
       </Card>
 
-      {/* Export Section (Milestone 1.6) */}
+      {/* Categories Management (Milestone 2.6) */}
+      <Card className="settings-card mb-4">
+        <div className="settings-section-header">
+          <h3 className="section-title" style={{ margin: 0 }}>
+            Categories ({categories.length})
+          </h3>
+          <Button
+            variant="secondary"
+            onClick={() => setCategoriesSheetOpen(true)}
+            aria-label="Manage categories"
+          >
+            Manage categories
+          </Button>
+        </div>
+        <p className="section-desc" style={{ marginBottom: 12 }}>
+          Add, rename, reorder, or remove categories for your time segments.
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+          {categories.map((cat) => (
+            <Chip key={cat} label={cat} size="sm" />
+          ))}
+        </div>
+      </Card>
+
+      {/* Categories Sheet Dialog */}
+      {user && (
+        <CategoriesSheet
+          isOpen={categoriesSheetOpen}
+          userId={user.id}
+          categories={categories}
+          onClose={() => setCategoriesSheetOpen(false)}
+          onCategoriesUpdated={handleCategoriesUpdated}
+          onToast={showToast}
+        />
+      )}
+
+      {/* Re-read All Entries (Milestone 2.6) */}
+      <Card className="settings-card mb-4">
+        <h3 className="section-title">Re-read Entries</h3>
+        <p className="section-desc" style={{ marginBottom: 8 }}>
+          Re-analyze your entries with the latest AI prompt model. To stay safely inside free tier
+          limits (15 requests per minute), entries are read one at a time with a pause between each.
+        </p>
+
+        {/* Switch to include confirmed segments */}
+        <div className="reread-toggle-group">
+          <label className="reread-toggle-label">
+            <input
+              type="checkbox"
+              checked={includeConfirmed}
+              onChange={(e) => setIncludeConfirmed(e.target.checked)}
+              disabled={isReReading}
+              aria-label="Include confirmed segments"
+            />
+            <span>Include confirmed segments</span>
+          </label>
+          <p className="reread-toggle-hint">
+            When unchecked, entries whose segments are already confirmed will be skipped.
+          </p>
+        </div>
+
+        {/* Progress Bar while re-reading */}
+        {isReReading && reReadProgress && (
+          <div className="reread-progress-container">
+            <div className="reread-progress-bar">
+              <div
+                className="reread-progress-fill"
+                style={{ width: `${reReadProgress.percent}%` }}
+              />
+            </div>
+            <div className="reread-progress-label">
+              Reading entry {reReadProgress.current} of {reReadProgress.total} (
+              {reReadProgress.percent}%)
+            </div>
+          </div>
+        )}
+
+        {/* Status text */}
+        {reReadStatusText && (
+          <div
+            className={reReadStatusText.includes('failed') ? 'sheet-error' : 'section-desc'}
+            style={{ marginTop: 10, marginBottom: 10 }}
+          >
+            {reReadStatusText}
+          </div>
+        )}
+
+        <div style={{ marginTop: 14 }}>
+          {isReReading ? (
+            <Button variant="destructive" onClick={handleStopReRead} aria-label="Stop re-reading">
+              Stop re-reading
+            </Button>
+          ) : (
+            <Button onClick={handleReReadAllEntries} aria-label="Re-read all entries">
+              Re-read all entries
+            </Button>
+          )}
+        </div>
+      </Card>
+
+      {/* Prompt Versions Breakdown (Milestone 2.6) */}
+      <Card className="settings-card mb-4">
+        <h3 className="section-title">Prompt Versions</h3>
+        <p className="section-desc" style={{ marginBottom: 6 }}>
+          Segments categorized by AI prompt version:
+        </p>
+
+        {sortedPromptVersions.length === 0 ? (
+          <p className="prompt-versions-empty">No segments logged yet.</p>
+        ) : (
+          <div className="prompt-versions-container">
+            {sortedPromptVersions.map((ver) => (
+              <div key={ver} className="prompt-version-pill">
+                <span className="prompt-version-tag">
+                  {ver === 'v2' ? 'v2 (current)' : ver}
+                </span>
+                <span className="prompt-version-count">{promptStats[ver]}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      {/* Export Section (Milestone 1.6 & 2.6) */}
       <Card className="settings-card mb-4">
         <h3 className="section-title">Export Entries</h3>
         <p className="section-desc" style={{ marginBottom: 16 }}>
-          Download your complete history as CSV or JSON for spreadsheets and analysis.
+          Download your complete history as CSV or JSON with segment details and follow-ups. Each
+          row represents one segment, matching History.
         </p>
 
         {/* Date range filter */}
@@ -237,22 +540,8 @@ export const SettingsPage: React.FC = () => {
         <p className="section-desc" style={{ marginBottom: 8 }}>
           Timezone: <strong>{timeZone}</strong>
         </p>
-        <p className="section-desc">
-          Push reminders will appear here in Stage 3.
-        </p>
+        <p className="section-desc">Push reminders will appear here in Stage 3.</p>
       </Card>
-
-      {/* Starter Categories Preview */}
-      {settings?.categories && settings.categories.length > 0 && (
-        <Card className="settings-card mb-4">
-          <h3 className="section-title">Categories ({settings.categories.length})</h3>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-            {settings.categories.map((cat) => (
-              <Chip key={cat} label={cat} size="sm" />
-            ))}
-          </div>
-        </Card>
-      )}
 
       <div style={{ marginTop: 24, textAlign: 'center' }}>
         <Button variant="secondary" onClick={() => navigate('/design')}>

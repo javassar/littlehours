@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from './supabase';
+import { supabase, isSupabaseConfigured } from './supabase.ts';
 
 export const STARTER_CATEGORIES = [
   'work',
@@ -79,4 +79,121 @@ export async function ensureUserSettings(userId: string): Promise<UserSettings |
     console.error('Failed to ensure user settings:', err);
     return null;
   }
+}
+
+/**
+ * Milestone 2.6: Update categories list in user settings
+ */
+export async function updateUserCategories(userId: string, newCategories: string[]): Promise<void> {
+  const { error } = await supabase
+    .from('settings')
+    .update({ categories: newCategories })
+    .eq('user_id', userId);
+
+  if (error) {
+    throw new Error(`Failed to update categories: ${error.message}`);
+  }
+}
+
+/**
+ * Milestone 2.6: Get count of segments using a category
+ */
+export async function getCategoryUsageCount(userId: string, category: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('segments')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('category', category.trim().toLowerCase());
+
+  if (error) {
+    console.warn('Error checking category usage:', error.message);
+    return 0;
+  }
+  return count || 0;
+}
+
+/**
+ * Milestone 2.6: Rename a category across settings and all existing segments
+ */
+export async function renameCategory(
+  userId: string,
+  oldName: string,
+  newName: string,
+  currentCategories: string[]
+): Promise<{ updatedCount: number; newCategories: string[] }> {
+  const cleanOld = oldName.trim().toLowerCase();
+  const cleanNew = newName.trim().toLowerCase();
+
+  if (!cleanNew) {
+    throw new Error('New category name cannot be empty');
+  }
+
+  // Update in category list
+  const newCategories = currentCategories.map((c) =>
+    c.trim().toLowerCase() === cleanOld ? cleanNew : c
+  );
+
+  // 1. Update settings
+  await updateUserCategories(userId, newCategories);
+
+  // 2. Update existing segments using old category name
+  const { data, error } = await supabase
+    .from('segments')
+    .update({ category: cleanNew })
+    .eq('user_id', userId)
+    .eq('category', cleanOld)
+    .select('id');
+
+  if (error) {
+    console.warn('Could not update segments for renamed category:', error.message);
+  }
+
+  return {
+    updatedCount: data?.length || 0,
+    newCategories,
+  };
+}
+
+/**
+ * Milestone 2.6: Delete a category (blocked if segments use it)
+ */
+export async function deleteCategory(
+  userId: string,
+  category: string,
+  currentCategories: string[]
+): Promise<{ success: boolean; usageCount?: number; newCategories?: string[] }> {
+  const cleanCat = category.trim().toLowerCase();
+  const usageCount = await getCategoryUsageCount(userId, cleanCat);
+
+  if (usageCount > 0) {
+    return { success: false, usageCount };
+  }
+
+  const newCategories = currentCategories.filter(
+    (c) => c.trim().toLowerCase() !== cleanCat
+  );
+
+  await updateUserCategories(userId, newCategories);
+  return { success: true, newCategories };
+}
+
+/**
+ * Milestone 2.6: Get segment counts grouped by prompt_version
+ */
+export async function getPromptVersionStats(userId: string): Promise<Record<string, number>> {
+  const { data, error } = await supabase
+    .from('segments')
+    .select('prompt_version')
+    .eq('user_id', userId);
+
+  if (error || !data) {
+    return {};
+  }
+
+  const stats: Record<string, number> = {};
+  for (const s of data) {
+    const version = s.prompt_version || 'v1';
+    stats[version] = (stats[version] || 0) + 1;
+  }
+  return stats;
 }
