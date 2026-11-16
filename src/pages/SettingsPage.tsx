@@ -10,8 +10,14 @@ import {
   getExportFileName,
   downloadFile,
   ExportEntry,
+  preparePainRatingExportRows,
+  generatePainRatingsCSV,
+  generatePainRatingsJSON,
+  getPainRatingsExportFileName,
+  PainRatingRaw,
+  SegmentForLookback,
 } from '../lib/export';
-import { getQueue } from '../lib/offlineQueue';
+import { getQueue, getRatingsQueue } from '../lib/offlineQueue';
 import {
   CategoryItem,
   normalizeCategories,
@@ -114,6 +120,7 @@ export const SettingsPage: React.FC = () => {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [exporting, setExporting] = useState<'csv' | 'json' | null>(null);
+  const [exportingPain, setExportingPain] = useState<'csv' | 'json' | null>(null);
   const [exportStatus, setExportStatus] = useState<string | null>(null);
 
   // Compute vacation hours for selected date range (Milestone 3.7)
@@ -695,6 +702,107 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
+  const handleExportPainRatings = async (format: 'csv' | 'json') => {
+    if (!user) return;
+    setExportingPain(format);
+    setExportStatus(null);
+
+    try {
+      // 1. Fetch pain ratings in date range
+      let ratingQuery = supabase
+        .from('pain_ratings')
+        .select('id, rating, rated_at, entry_id, created_at')
+        .eq('user_id', user.id)
+        .order('rated_at', { ascending: true });
+
+      if (fromDate) {
+        const startOfDay = new Date(`${fromDate}T00:00:00`);
+        ratingQuery = ratingQuery.gte('rated_at', startOfDay.toISOString());
+      }
+      if (toDate) {
+        const endOfDay = new Date(`${toDate}T23:59:59.999`);
+        ratingQuery = ratingQuery.lte('rated_at', endOfDay.toISOString());
+      }
+
+      const { data: ratingRows, error: ratingErr } = await ratingQuery;
+      if (ratingErr) {
+        throw new Error(ratingErr.message);
+      }
+
+      const allRatingsList: PainRatingRaw[] = [...(ratingRows || [])];
+
+      // Also include any matching queued offline ratings
+      try {
+        const qRatings = await getRatingsQueue();
+        const userQRatings = qRatings.filter((r) => r.user_id === user.id);
+        for (const qr of userQRatings) {
+          if (!allRatingsList.some((r) => r.id === qr.id)) {
+            let match = true;
+            if (fromDate) {
+              match = match && new Date(qr.rated_at) >= new Date(`${fromDate}T00:00:00`);
+            }
+            if (toDate) {
+              match = match && new Date(qr.rated_at) <= new Date(`${toDate}T23:59:59.999`);
+            }
+            if (match) {
+              allRatingsList.push(qr);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Could not read ratings queue:', err);
+      }
+
+      if (allRatingsList.length === 0) {
+        setExportStatus('No pain ratings found for the selected date range.');
+        showToast('No pain ratings to export');
+        setExportingPain(null);
+        return;
+      }
+
+      // 2. Fetch entries and segments needed for lookback calculations
+      const rawEntries = await fetchExportEntries();
+
+      // Collect all segments
+      const segments: SegmentForLookback[] = [];
+      for (const e of rawEntries) {
+        if (Array.isArray(e.segments)) {
+          for (const s of e.segments) {
+            segments.push({
+              id: s.id,
+              entry_id: e.id,
+              start_time: s.start_time,
+              end_time: s.end_time,
+              activity_label: s.activity_label,
+              category: s.category,
+              company: s.company,
+              parse_status: (e as any).parse_status || 'parsed',
+            });
+          }
+        }
+      }
+
+      const rows = preparePainRatingExportRows(allRatingsList, rawEntries, segments, timeZone);
+      const filename = getPainRatingsExportFileName(format, timeZone);
+
+      if (format === 'csv') {
+        const csvContent = generatePainRatingsCSV(rows);
+        downloadFile(csvContent, filename, 'text/csv;charset=utf-8;');
+        showToast(`Exported ${rows.length} pain rating(s) to CSV`);
+      } else {
+        const jsonContent = generatePainRatingsJSON(rows);
+        downloadFile(jsonContent, filename, 'application/json;charset=utf-8;');
+        showToast(`Exported ${rows.length} pain rating(s) to JSON`);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      setExportStatus(`Failed to export pain ratings: ${msg}`);
+      showToast('Export failed');
+    } finally {
+      setExportingPain(null);
+    }
+  };
+
   const handleClearDateRange = () => {
     setFromDate('');
     setToDate('');
@@ -989,7 +1097,7 @@ export const SettingsPage: React.FC = () => {
         <div className="export-button-row" style={{ marginTop: 16 }}>
           <Button
             onClick={() => handleExport('csv')}
-            disabled={exporting !== null}
+            disabled={exporting !== null || exportingPain !== null}
             aria-label="Export CSV"
           >
             {exporting === 'csv' ? 'Exporting CSV...' : 'Export CSV'}
@@ -997,10 +1105,30 @@ export const SettingsPage: React.FC = () => {
           <Button
             variant="secondary"
             onClick={() => handleExport('json')}
-            disabled={exporting !== null}
+            disabled={exporting !== null || exportingPain !== null}
             aria-label="Export JSON"
           >
             {exporting === 'json' ? 'Exporting JSON...' : 'Export JSON'}
+          </Button>
+        </div>
+
+        {/* Milestone 3.7: Pain ratings export buttons */}
+        <div className="export-button-row" style={{ marginTop: 10 }}>
+          <Button
+            variant="secondary"
+            onClick={() => handleExportPainRatings('csv')}
+            disabled={exporting !== null || exportingPain !== null}
+            aria-label="Export pain ratings (CSV)"
+          >
+            {exportingPain === 'csv' ? 'Exporting CSV...' : 'Export pain ratings (CSV)'}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => handleExportPainRatings('json')}
+            disabled={exporting !== null || exportingPain !== null}
+            aria-label="Export pain ratings (JSON)"
+          >
+            {exportingPain === 'json' ? 'Exporting JSON...' : 'Export pain ratings (JSON)'}
           </Button>
         </div>
       </Card>

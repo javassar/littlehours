@@ -13,16 +13,20 @@ import {
   FollowUpItem,
   TrashIcon,
   Chip,
+  RatingEditSheet,
+  RatingItem,
 } from '../components';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { retryParseEntry, parseEntryInBackground } from '../lib/parse';
+import { getPainWord } from '../lib/painScale';
 import {
   formatTimeRange,
   formatDuration,
   formatDayHeading,
   getDayKey,
   formatDurationMs,
+  formatTime,
 } from '../lib/time';
 import {
   getQueue,
@@ -30,6 +34,10 @@ import {
   enqueueEntry,
   dequeueEntry,
   QueuedEntry,
+  getRatingsQueue,
+  subscribeToRatingsQueue,
+  dequeueRating,
+  QueuedRating,
 } from '../lib/offlineQueue';
 import { OverlapAdjustmentsPayload } from '../lib/overlap';
 
@@ -45,6 +53,12 @@ export const HistoryPage: React.FC = () => {
   const [loadingEarlier, setLoadingEarlier] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [offset, setOffset] = useState(0);
+
+  // Milestone 3.7: Pain ratings state
+  const [ratings, setRatings] = useState<RatingItem[]>([]);
+  const [queuedRatings, setQueuedRatings] = useState<QueuedRating[]>([]);
+  const [selectedRating, setSelectedRating] = useState<RatingItem | null>(null);
+  const [isRatingEditOpen, setIsRatingEditOpen] = useState(false);
 
   // Edit sheet state
   const [selectedEntry, setSelectedEntry] = useState<EntryItem | null>(null);
@@ -75,6 +89,39 @@ export const HistoryPage: React.FC = () => {
       setQueuedEntries(q.filter((e) => e.user_id === user.id));
     } catch (err) {
       console.error('Failed to load queued entries in History:', err);
+    }
+  }, [user]);
+
+  // Milestone 3.7: Load offline queued ratings
+  const loadQueuedRatings = useCallback(async () => {
+    if (!user) return;
+    try {
+      const q = await getRatingsQueue();
+      setQueuedRatings(q.filter((r) => r.user_id === user.id));
+    } catch (err) {
+      console.error('Failed to load queued ratings in History:', err);
+    }
+  }, [user]);
+
+  // Milestone 3.7: Fetch pain ratings from Supabase
+  const fetchRatings = useCallback(async () => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from('pain_ratings')
+        .select('id, entry_id, rating, rated_at, created_at')
+        .eq('user_id', user.id)
+        .order('rated_at', { ascending: false });
+
+      if (error) {
+        console.warn('Could not load pain ratings (table may not exist yet):', error.message);
+        return;
+      }
+      if (data) {
+        setRatings(data);
+      }
+    } catch (err) {
+      console.error('Failed to load pain ratings in History:', err);
     }
   }, [user]);
 
@@ -149,10 +196,12 @@ export const HistoryPage: React.FC = () => {
 
   useEffect(() => {
     fetchEntries(0, true);
+    fetchRatings();
     loadQueued();
+    loadQueuedRatings();
 
-    // Subscribe to queue changes so UI refreshes as soon as items sync or are queued
-    const unsubscribe = subscribeToQueue(async (updatedQueue) => {
+    // Subscribe to entries queue changes so UI refreshes as soon as items sync or are queued
+    const unsubscribeQueue = subscribeToQueue(async (updatedQueue) => {
       if (user) {
         setQueuedEntries(updatedQueue.filter((e) => e.user_id === user.id));
         // Refresh server entries to show recently synced items
@@ -160,10 +209,19 @@ export const HistoryPage: React.FC = () => {
       }
     });
 
+    // Subscribe to ratings queue changes
+    const unsubscribeRatings = subscribeToRatingsQueue(async (updatedRatingsQueue) => {
+      if (user) {
+        setQueuedRatings(updatedRatingsQueue.filter((r) => r.user_id === user.id));
+        fetchRatings();
+      }
+    });
+
     return () => {
-      unsubscribe();
+      unsubscribeQueue();
+      unsubscribeRatings();
     };
-  }, [fetchEntries, loadQueued, user]);
+  }, [fetchEntries, fetchRatings, loadQueued, loadQueuedRatings, user]);
 
   // Poll for background AI parsing updates whenever any entry has parse_status === 'pending'
   useEffect(() => {
@@ -293,6 +351,10 @@ export const HistoryPage: React.FC = () => {
     if (isQueued) {
       await dequeueEntry(id);
       await loadQueued();
+      // Milestone 3.7: Deleting an entry leaves its rating in place as a standalone rating card
+      setQueuedRatings((prev) =>
+        prev.map((r) => (r.entry_id === id ? { ...r, entry_id: null } : r))
+      );
       showToast('Entry deleted');
       return;
     }
@@ -303,8 +365,122 @@ export const HistoryPage: React.FC = () => {
       throw new Error(error.message);
     }
 
+    // Milestone 3.7: Postgres foreign key 'on delete set null' keeps the rating.
+    // Update local state immediately so it displays as standalone rating card.
+    setRatings((prev) =>
+      prev.map((r) => (r.entry_id === id ? { ...r, entry_id: null } : r))
+    );
     setEntries((prev) => prev.filter((item) => item.id !== id));
     showToast('Entry deleted');
+  };
+
+  // Milestone 3.7: Handle standalone rating edit save
+  const handleSaveStandaloneRating = async (id: string, newRating: number, newRatedAt: string) => {
+    const isQueued = queuedRatings.some((r) => r.id === id);
+
+    if (isQueued) {
+      const q = await getRatingsQueue();
+      const updatedQ = q.map((r) =>
+        r.id === id ? { ...r, rating: newRating, rated_at: newRatedAt } : r
+      );
+      setQueuedRatings(updatedQ.filter((r) => r.user_id === user?.id));
+      showToast('Rating updated');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('pain_ratings')
+      .update({
+        rating: newRating,
+        rated_at: newRatedAt,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    setRatings((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, rating: newRating, rated_at: newRatedAt } : r))
+    );
+    showToast('Rating updated');
+  };
+
+  // Milestone 3.7: Handle rating delete
+  const handleDeleteRating = async (id: string) => {
+    const isQueued = queuedRatings.some((r) => r.id === id);
+
+    if (isQueued) {
+      await dequeueRating(id);
+      await loadQueuedRatings();
+      showToast('Rating deleted');
+      return;
+    }
+
+    const { error } = await supabase.from('pain_ratings').delete().eq('id', id);
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    setRatings((prev) => prev.filter((r) => r.id !== id));
+    showToast('Rating deleted');
+  };
+
+  // Milestone 3.7: Save rating from EntryEditSheet
+  const handleSaveRatingForEntry = async (
+    entryId: string,
+    ratingId: string | undefined,
+    newRating: number | null
+  ) => {
+    if (newRating === null) {
+      if (ratingId) {
+        await handleDeleteRating(ratingId);
+      }
+      return;
+    }
+
+    if (ratingId) {
+      const { error } = await supabase
+        .from('pain_ratings')
+        .update({
+          rating: newRating,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', ratingId);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setRatings((prev) =>
+        prev.map((r) => (r.id === ratingId ? { ...r, rating: newRating } : r))
+      );
+      showToast('Rating updated');
+    } else {
+      const entry = entries.find((e) => e.id === entryId);
+      const ratedAt = entry?.window_end || new Date().toISOString();
+      const newId = crypto.randomUUID();
+      const payload: RatingItem = {
+        id: newId,
+        entry_id: entryId,
+        rating: newRating,
+        rated_at: ratedAt,
+        created_at: new Date().toISOString(),
+      };
+
+      const { error } = await supabase.from('pain_ratings').insert({
+        ...payload,
+        user_id: user!.id,
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setRatings((prev) => [payload, ...prev]);
+      showToast('Rating saved');
+    }
   };
 
   // Open edit sheet or confirmation sheet
@@ -484,8 +660,24 @@ export const HistoryPage: React.FC = () => {
     );
   }
 
-  // Empty state with Deer illustration (only if neither server entries nor queued entries exist)
-  if (entries.length === 0 && queuedEntries.length === 0) {
+  // Milestone 3.7: Combine queued ratings and server ratings
+  const allRatings = useMemo(() => {
+    return [
+      ...queuedRatings.map((r) => ({ ...r, isQueued: true })),
+      ...ratings,
+    ];
+  }, [queuedRatings, ratings]);
+
+  const standaloneRatings = useMemo(() => {
+    const allEntryIds = new Set([
+      ...entries.map((e) => e.id),
+      ...queuedEntries.map((e) => e.id),
+    ]);
+    return allRatings.filter((r) => !r.entry_id || !allEntryIds.has(r.entry_id));
+  }, [allRatings, entries, queuedEntries]);
+
+  // Empty state with Deer illustration (only if neither entries nor ratings exist)
+  if (entries.length === 0 && queuedEntries.length === 0 && allRatings.length === 0) {
     return (
       <div className="page-container screen-fade-in">
         <div className="empty-history-state">
@@ -498,18 +690,21 @@ export const HistoryPage: React.FC = () => {
     );
   }
 
-  // Group synced entries by day in user's timezone
+  // Milestone 3.7: Group entries and standalone ratings by day in user's timezone
+  type DayGroupItem =
+    | { kind: 'entry'; entry: EntryItem; indexInAll: number; timestamp: number }
+    | { kind: 'rating'; rating: RatingItem; timestamp: number };
+
   interface DayGroup {
     heading: string;
-    entries: {
-      entry: EntryItem;
-      indexInAll: number;
-    }[];
+    items: DayGroupItem[];
+    ratingCount: number;
   }
 
   const dayGroups: DayGroup[] = [];
   const dayGroupMap = new Map<string, DayGroup>();
 
+  // 1. Add entries to day groups
   entries.forEach((entry, idx) => {
     const endDate = new Date(entry.window_end);
     const key = getDayKey(endDate, timeZone);
@@ -517,32 +712,86 @@ export const HistoryPage: React.FC = () => {
     if (!dayGroupMap.has(key)) {
       const newGroup: DayGroup = {
         heading: formatDayHeading(endDate, timeZone),
-        entries: [],
+        items: [],
+        ratingCount: 0,
       };
       dayGroupMap.set(key, newGroup);
       dayGroups.push(newGroup);
     }
 
-    dayGroupMap.get(key)!.entries.push({ entry, indexInAll: idx });
+    dayGroupMap.get(key)!.items.push({
+      kind: 'entry',
+      entry,
+      indexInAll: idx,
+      timestamp: endDate.getTime(),
+    });
+  });
+
+  // 2. Add standalone ratings (synced ones appear in day lists; queued standalone appear in Waiting to sync)
+  standaloneRatings
+    .filter((r) => !r.isQueued)
+    .forEach((rating) => {
+      const ratedAtDate = new Date(rating.rated_at);
+      const key = getDayKey(ratedAtDate, timeZone);
+
+      if (!dayGroupMap.has(key)) {
+        const newGroup: DayGroup = {
+          heading: formatDayHeading(ratedAtDate, timeZone),
+          items: [],
+          ratingCount: 0,
+        };
+        dayGroupMap.set(key, newGroup);
+        dayGroups.push(newGroup);
+      }
+
+      dayGroupMap.get(key)!.items.push({
+        kind: 'rating',
+        rating,
+        timestamp: ratedAtDate.getTime(),
+      });
+    });
+
+  // Sort day groups chronologically (most recent day first)
+  dayGroups.sort((a, b) => {
+    const maxA = Math.max(...a.items.map((i) => i.timestamp), 0);
+    const maxB = Math.max(...b.items.map((i) => i.timestamp), 0);
+    return maxB - maxA;
+  });
+
+  // For each day group, sort items newest first and compute ratingCount for the day
+  dayGroups.forEach((group) => {
+    group.items.sort((a, b) => b.timestamp - a.timestamp);
+
+    // Compute ratingCount: total ratings whose rated_at falls on this day
+    let count = 0;
+    allRatings.forEach((r) => {
+      const rDay = formatDayHeading(new Date(r.rated_at), timeZone);
+      if (rDay === group.heading) {
+        count++;
+      }
+    });
+    group.ratingCount = count;
   });
 
   return (
     <div className="page-container screen-fade-in history-page">
       <Toast visible={toastVisible} message={toastMessage} onClose={() => setToastVisible(false)} />
 
-      {/* 1. Queued offline entries shown at the very top with "Waiting to sync" badge */}
-      {queuedEntries.length > 0 && (
+      {/* 1. Queued offline entries and ratings shown at the very top with "Waiting to sync" badge */}
+      {(queuedEntries.length > 0 || queuedRatings.filter((r) => !r.entry_id).length > 0) && (
         <section className="history-day-section history-queued-section">
           <h2 className="history-day-heading" style={{ color: 'var(--mauve)' }}>
-            Waiting to sync ({queuedEntries.length})
+            Waiting to sync ({queuedEntries.length + queuedRatings.filter((r) => !r.entry_id).length})
           </h2>
 
           <div className="history-entries-list">
+            {/* Queued entries */}
             {queuedEntries.map((entry) => {
               const start = new Date(entry.window_start);
               const end = new Date(entry.window_end);
               const rangeStr = formatTimeRange(start, end, timeZone);
               const durationStr = formatDuration(start, end);
+              const linkedQueuedRating = allRatings.find((r) => r.entry_id === entry.id);
 
               return (
                 <Card
@@ -562,7 +811,24 @@ export const HistoryPage: React.FC = () => {
                   aria-label={`Entry from ${rangeStr}, waiting to sync. Click to edit.`}
                 >
                   <div className="history-card-header">
-                    <span className="history-time-range">{rangeStr}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span className="history-time-range">{rangeStr}</span>
+                      {linkedQueuedRating && (
+                        <button
+                          type="button"
+                          className="entry-pain-pill"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedRating(linkedQueuedRating);
+                            setIsRatingEditOpen(true);
+                          }}
+                          title="Click to edit rating"
+                          aria-label={`Pain ${linkedQueuedRating.rating}. Click to edit.`}
+                        >
+                          Pain {linkedQueuedRating.rating}
+                        </button>
+                      )}
+                    </div>
 
                     <div className="history-card-header-actions">
                       <span className="history-duration-badge">{durationStr}</span>
@@ -589,21 +855,128 @@ export const HistoryPage: React.FC = () => {
                 </Card>
               );
             })}
+
+            {/* Queued standalone ratings */}
+            {queuedRatings
+              .filter((r) => !r.entry_id || !queuedEntries.some((e) => e.id === r.entry_id))
+              .map((r) => {
+                const ratedDate = new Date(r.rated_at);
+                const hourStartDate = new Date(ratedDate.getTime() - 60 * 60 * 1000);
+                const coverage = `${formatTime(hourStartDate, timeZone)} to ${formatTime(ratedDate, timeZone)}`;
+                const word = getPainWord(r.rating);
+
+                return (
+                  <Card
+                    key={r.id}
+                    ornamental={true}
+                    className="history-rating-card history-queued-card"
+                    onClick={() => {
+                      setSelectedRating(r);
+                      setIsRatingEditOpen(true);
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.target !== e.currentTarget) return;
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setSelectedRating(r);
+                        setIsRatingEditOpen(true);
+                      }
+                    }}
+                    aria-label={`Pain rating ${r.rating}, ${word} for ${coverage}, waiting to sync. Click to edit.`}
+                  >
+                    <div className="history-rating-card-row">
+                      <span className="history-rating-card-time">{coverage}</span>
+                      <div className="history-rating-card-badges">
+                        <span className="entry-pain-pill">Pain {r.rating}</span>
+                        {word && <span className="history-rating-word">{word}</span>}
+                        <span className="history-waiting-badge">
+                          <span className="waiting-pulse-dot" />
+                          Waiting to sync
+                        </span>
+                        <button
+                          type="button"
+                          className="history-card-trash-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteRating(r.id);
+                          }}
+                          aria-label="Delete this queued rating"
+                          title="Delete this rating"
+                        >
+                          <TrashIcon size={15} color="var(--danger)" />
+                        </button>
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })}
           </div>
         </section>
       )}
 
-      {/* 2. Synced history entries grouped by day */}
+      {/* 2. Synced history entries & standalone ratings grouped by day */}
       {dayGroups.map((group) => (
         <section key={group.heading} className="history-day-section">
-          <h2 className="history-day-heading">{group.heading}</h2>
+          <h2 className="history-day-heading">
+            <span>{group.heading}</span>
+            {group.ratingCount > 0 && (
+              <span className="history-day-ratings-count">
+                {group.ratingCount} {group.ratingCount === 1 ? 'rating' : 'ratings'}
+              </span>
+            )}
+          </h2>
 
           <div className="history-entries-list">
-            {group.entries.map(({ entry, indexInAll }) => {
+            {group.items.map((item) => {
+              if (item.kind === 'rating') {
+                const r = item.rating;
+                const ratedDate = new Date(r.rated_at);
+                const hourStartDate = new Date(ratedDate.getTime() - 60 * 60 * 1000);
+                const coverage = `${formatTime(hourStartDate, timeZone)} to ${formatTime(ratedDate, timeZone)}`;
+                const word = getPainWord(r.rating);
+
+                return (
+                  <Card
+                    key={r.id}
+                    ornamental={true}
+                    className="history-rating-card"
+                    onClick={() => {
+                      setSelectedRating(r);
+                      setIsRatingEditOpen(true);
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.target !== e.currentTarget) return;
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setSelectedRating(r);
+                        setIsRatingEditOpen(true);
+                      }
+                    }}
+                    aria-label={`Pain rating ${r.rating}, ${word} for ${coverage}. Click to edit.`}
+                  >
+                    <div className="history-rating-card-row">
+                      <span className="history-rating-card-time">{coverage}</span>
+                      <div className="history-rating-card-badges">
+                        <span className="entry-pain-pill">Pain {r.rating}</span>
+                        {word && <span className="history-rating-word">{word}</span>}
+                      </div>
+                    </div>
+                  </Card>
+                );
+              }
+
+              // item.kind === 'entry'
+              const entry = item.entry;
+              const indexInAll = item.indexInAll;
               const start = new Date(entry.window_start);
               const end = new Date(entry.window_end);
               const rangeStr = formatTimeRange(start, end, timeZone);
               const durationStr = formatDuration(start, end);
+              const linkedRating = allRatings.find((r) => r.entry_id === entry.id);
 
               // Check gap or overlap with the chronologically earlier entry (indexInAll + 1)
               const nextEntry = entries[indexInAll + 1];
@@ -642,7 +1015,24 @@ export const HistoryPage: React.FC = () => {
                     aria-label={`Entry from ${rangeStr}, ${durationStr}. Click to edit.`}
                   >
                     <div className="history-card-header">
-                      <span className="history-time-range">{rangeStr}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span className="history-time-range">{rangeStr}</span>
+                        {linkedRating && (
+                          <button
+                            type="button"
+                            className="entry-pain-pill"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedRating(linkedRating);
+                              setIsRatingEditOpen(true);
+                            }}
+                            title="Click to edit rating"
+                            aria-label={`Pain ${linkedRating.rating}. Click to edit.`}
+                          >
+                            Pain {linkedRating.rating}
+                          </button>
+                        )}
+                      </div>
 
                       <div className="history-card-header-actions">
                         <span className="history-duration-badge">{durationStr}</span>
@@ -870,7 +1260,7 @@ export const HistoryPage: React.FC = () => {
         }}
       />
 
-      {/* Edit & Delete sheet */}
+      {/* Edit & Delete sheet for entries */}
       <EntryEditSheet
         entry={selectedEntry}
         isOpen={isEditOpen}
@@ -880,6 +1270,25 @@ export const HistoryPage: React.FC = () => {
         }}
         onSave={handleSaveEntry}
         onDelete={handleDeleteEntry}
+        currentRating={
+          selectedEntry
+            ? allRatings.find((r) => r.entry_id === selectedEntry.id) || null
+            : null
+        }
+        onSaveRating={handleSaveRatingForEntry}
+      />
+
+      {/* Standalone Rating Edit & Delete sheet (Milestone 3.7) */}
+      <RatingEditSheet
+        isOpen={isRatingEditOpen}
+        rating={selectedRating}
+        onClose={() => {
+          setIsRatingEditOpen(false);
+          setSelectedRating(null);
+        }}
+        onSave={handleSaveStandaloneRating}
+        onDelete={handleDeleteRating}
+        timeZone={timeZone}
       />
     </div>
   );

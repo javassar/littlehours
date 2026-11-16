@@ -37,7 +37,7 @@ self.addEventListener('push', (event) => {
   }
 
   const title = data.title || 'Little Hours';
-  const body = data.body || 'Tell me how you spent the past hour.';
+  const body = data.body || 'Tell me how you spent the past hour, and rate your pain.';
 
   const options: NotificationOptions = {
     body,

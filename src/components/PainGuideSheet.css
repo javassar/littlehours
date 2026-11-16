@@ -1,0 +1,140 @@
+.pain-guide-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(75, 51, 64, 0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.pain-guide-surface {
+  background-color: var(--surface);
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  width: 100%;
+  max-width: 520px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 -8px 32px rgba(75, 51, 64, 0.2);
+  border-top: 1px solid rgba(184, 114, 127, 0.3);
+  box-sizing: border-box;
+  animation: painGuideSlideUp 260ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes painGuideSlideUp {
+  0% { transform: translateY(100%); }
+  100% { transform: translateY(0); }
+}
+
+.pain-guide-header {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid rgba(184, 114, 127, 0.15);
+  position: relative;
+  text-align: center;
+}
+
+.pain-guide-handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background-color: rgba(142, 107, 122, 0.3);
+  margin: 0 auto 10px;
+}
+
+.pain-guide-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: none;
+  border: none;
+  padding: 6px;
+  cursor: pointer;
+  color: var(--mauve);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pain-guide-close:hover {
+  color: var(--rose-deep);
+  background-color: rgba(217, 165, 174, 0.15);
+}
+
+.pain-guide-title {
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 4px;
+}
+
+.pain-guide-subtitle {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--mauve);
+  margin: 0;
+}
+
+.pain-guide-body {
+  padding: 16px 20px 24px;
+  overflow-y: auto;
+}
+
+.pain-guide-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pain-guide-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  background-color: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(184, 114, 127, 0.2);
+  border-radius: 16px;
+  padding: 12px 14px;
+}
+
+.pain-guide-badge {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1.5px solid var(--rose-deep);
+  color: var(--ink);
+  background-color: var(--surface);
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pain-guide-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.pain-guide-word {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+  text-transform: capitalize;
+}
+
+.pain-guide-meaning {
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--mauve);
+}

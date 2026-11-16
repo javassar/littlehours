@@ -77,6 +77,43 @@ export function checkRecentEntry(
   return { isRecent: false, minutesAgo };
 }
 
+/**
+ * Milestone 3.7: Check if the user either logged an entry or saved a pain rating
+ * within the last 30 minutes. Either one suppresses the reminder.
+ */
+export function checkRecentActivity(
+  latestWindowEnd: string | Date | null | undefined,
+  latestRatedAt: string | Date | null | undefined,
+  currentTime: Date,
+  thresholdMs: number = 30 * 60 * 1000
+): RecentEntryCheckResult {
+  const entryCheck = checkRecentEntry(latestWindowEnd, currentTime, thresholdMs);
+  let ratingCheck: RecentEntryCheckResult = { isRecent: false, minutesAgo: -1 };
+
+  if (latestRatedAt) {
+    const ratedAt = new Date(latestRatedAt);
+    if (!isNaN(ratedAt.getTime())) {
+      const diffMs = currentTime.getTime() - ratedAt.getTime();
+      if (diffMs >= -60_000 && diffMs <= thresholdMs) {
+        const minutesAgo = Math.max(0, Math.round(diffMs / 60000));
+        ratingCheck = {
+          isRecent: true,
+          minutesAgo,
+          reason: `rated pain recently (latest rating at ${ratedAt.toISOString()}, ${minutesAgo}m ago)`,
+        };
+      }
+    }
+  }
+
+  if (entryCheck.isRecent && ratingCheck.isRecent) {
+    return entryCheck.minutesAgo <= ratingCheck.minutesAgo ? entryCheck : ratingCheck;
+  }
+  if (entryCheck.isRecent) return entryCheck;
+  if (ratingCheck.isRecent) return ratingCheck;
+
+  return { isRecent: false, minutesAgo: -1 };
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -183,10 +220,10 @@ Deno.serve(async (req: Request) => {
     let totalPruned = 0;
     const skippedLog: Array<{ user_id: string; reason: string }> = [];
 
-    // Notification payload
+    // Notification payload (Milestone 3.7: includes pain rating prompt)
     const payload = JSON.stringify({
       title: 'Little Hours',
-      body: 'Tell me how you spent the past hour.',
+      body: 'Tell me how you spent the past hour, and rate your pain.',
       url: '/?focus=1',
     });
 
@@ -234,7 +271,7 @@ Deno.serve(async (req: Request) => {
         continue;
       }
 
-      // Rule 4: Skip when user has just logged within the last 30 minutes (Milestone 3.5)
+      // Rule 4: Skip when user has just logged or rated pain within the last 30 minutes (Milestones 3.5 & 3.7)
       if (!ignoreRecentLog) {
         const { data: latestEntry, error: entryError } = await supabase
           .from('entries')
@@ -246,18 +283,35 @@ Deno.serve(async (req: Request) => {
 
         if (entryError) {
           console.warn(`[send-reminders] Could not check recent entries for user ${userId}:`, entryError.message);
-        } else if (latestEntry && latestEntry.window_end) {
-          const recentCheck = checkRecentEntry(latestEntry.window_end, currentTime);
-          if (recentCheck.isRecent) {
-            console.log(
-              `[send-reminders] Skipped user ${userId}: ${recentCheck.reason}`
-            );
-            skippedLog.push({
-              user_id: userId,
-              reason: recentCheck.reason || 'logged recently',
-            });
-            continue;
-          }
+        }
+
+        const { data: latestRating, error: ratingError } = await supabase
+          .from('pain_ratings')
+          .select('id, rated_at')
+          .eq('user_id', userId)
+          .order('rated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (ratingError) {
+          console.warn(`[send-reminders] Could not check recent ratings for user ${userId}:`, ratingError.message);
+        }
+
+        const recentCheck = checkRecentActivity(
+          latestEntry?.window_end,
+          latestRating?.rated_at,
+          currentTime
+        );
+
+        if (recentCheck.isRecent) {
+          console.log(
+            `[send-reminders] Skipped user ${userId}: ${recentCheck.reason}`
+          );
+          skippedLog.push({
+            user_id: userId,
+            reason: recentCheck.reason || 'logged or rated pain recently',
+          });
+          continue;
         }
       }
 

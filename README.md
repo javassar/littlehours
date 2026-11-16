@@ -116,9 +116,77 @@ npm run preview
 - [x] **Milestone 3.3**: Hourly sender Edge Function (`send-reminders`), quiet hours enforcement (8 AM - 11 PM), subscription pruning (404/410), and `pg_cron` schedule.
 - [x] **Milestone 3.4**: Reminder schedule controls, 1-hour snooze support, test reminder trigger, and friendly next reminder calculations.
 - [x] **Milestone 3.5**: Intelligent skip when user has logged within the last 30 minutes, with detailed logging of skip reasons.
-- [x] **Milestone 3.7**: Categories, Company Field, and Vacation Mode:
+- [x] **Milestone 3.6**: Categories, Company Field, and Vacation Mode:
   - **Database additions**: `segments.company text[]` with GIN index, `entries.on_vacation boolean`, `settings.vacation_mode boolean`, `settings.categories` updated to 25 objects with `{ name, description }`.
   - **AI Parser v2**: Prompt version `v2` in `parse-entry` with tie-break rules, company extraction with casing canonicalization, and `on_vacation` override.
   - **Vacation Mode Switch**: Persistent vacation toggle on Log screen with `--lavender` reminder ribbon and entry edit sheet toggle.
   - **Company & People Screen**: Outlined company chips on confirmation and history, in-place tag editing with autocomplete, and Settings People screen to view hours, rename/merge, and remove tags.
   - **Export Updates**: Segments CSV/JSON export includes `company`, entries include `on_vacation`, and export card shows Vacation hours for the filtered period.
+- [x] **Milestone 3.7**: Hourly Pain Rating (1 to 5):
+  - **Database additions**: `pain_ratings` table (`id`, `user_id`, `entry_id` references `entries(id) on delete set null`, `rating smallint 1..5`, `rated_at timestamptz`, `created_at`, `updated_at`) with RLS policy `"own ratings"`.
+  - **Scale & Guide**: Fixed 1 to 5 anchors in `src/lib/painScale.ts` with modal guide sheet (`PainGuideSheet`).
+  - **Rating Control**: Accessible radiogroup buttons with arrow navigation and clear-on-tap toggle (`PainRating`).
+  - **Log Screen Integration**: Save text + rating together, or standalone rating in one tap without altering entry window start time.
+  - **History Display**: "Pain X" pills on entry cards, compact cards for standalone ratings, and rating counts per day heading.
+  - **Reminders Update**: Skip reminders when logged or rated pain within the past 30 minutes. Notification body asks to rate pain.
+  - **Pain Ratings Export**: Dedicated CSV and JSON exports with client-side join in `src/lib/export.ts` computing lookback windows (60, 180, 1440 min) and unlogged time.
+  - **Data Privacy**: Complete separation between health pain ratings and the AI parser (`parse-entry`).
+
+---
+
+## Data Model
+
+### `pain_ratings` Table
+```sql
+create table pain_ratings (
+  id uuid primary key,                         -- generated on the phone so offline retries never duplicate
+  user_id uuid not null default auth.uid() references auth.users(id),
+  entry_id uuid references entries(id) on delete set null,   -- kept if the entry is deleted
+  rating smallint not null check (rating between 1 and 5),
+  rated_at timestamptz not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index pain_ratings_rated_at_idx on pain_ratings (rated_at desc);
+create index pain_ratings_entry_id_idx on pain_ratings (entry_id);
+create index pain_ratings_user_id_idx on pain_ratings (user_id);
+
+alter table pain_ratings enable row level security;
+create policy "own ratings" on pain_ratings
+  for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+```
+
+---
+
+## Pain Ratings Export & Analysis Join
+
+Pain ratings are exported via **Settings → Export pain ratings (CSV / JSON)**. The join between ratings, entries, and activity segments is performed entirely in client-side TypeScript (`src/lib/export.ts`) to maintain complete separation between private health data and database stored procedures or external APIs.
+
+### Export Columns (18 fields)
+| Column | Type | Description |
+|---|---|---|
+| `id` | UUID | Rating ID |
+| `rated_at` | ISO 8601 | End of the 60-minute hour being rated (UTC) |
+| `local_rated_at` | String | Same time formatted in user's timezone |
+| `hour_start` | ISO 8601 | `rated_at` minus 60 minutes |
+| `rating` | Integer | Average pain rating over the hour (1 to 5) |
+| `entered_at` | ISO 8601 | Actual timestamp when rating was submitted |
+| `minutes_since_previous_rating` | Integer | Minutes elapsed since previous rating (empty for first; < 60 indicates overlapping rated hours) |
+| `entry_id` | UUID | Associated entry ID (empty for standalone ratings) |
+| `segment_category` | String | Category of the activity segment containing `rated_at` (`start_time <= rated_at < end_time`) |
+| `segment_label` | String | Specific activity label of that containing segment |
+| `segment_company` | String / Array | People in that segment (semicolon-separated in CSV, array in JSON) |
+| `on_vacation` | Boolean | True if the containing segment/entry was marked as vacation time |
+| `prior_60_min_by_category` | Object / JSON | Minutes per category in the 60 minutes before `rated_at` (same hour as rated) |
+| `prior_180_min_by_category` | Object / JSON | Minutes per category in the 180 minutes before `rated_at` (3 hours) |
+| `prior_1440_min_by_category` | Object / JSON | Minutes per category in the 1440 minutes before `rated_at` (24 hours) |
+| `prior_60_unlogged_min` | Integer | Minutes in the 60m window not covered by any parsed segment |
+| `prior_180_unlogged_min` | Integer | Minutes in the 180m window not covered by any parsed segment |
+| `prior_1440_unlogged_min` | Integer | Minutes in the 1440m window not covered by any parsed segment |
+
+### Join Methodology
+1. **Containing Segment**: A segment contains `rated_at` when `start_time <= rated_at < end_time`.
+2. **Lookback Windows**: For each lookback window `[rated_at - N minutes, rated_at]`, segments are clipped to the window boundaries. Overlapping minutes for each category are summed.
+3. **Unlogged Time**: Unlogged minutes are computed as `N - total_covered_minutes`.
+4. **Parsed Segments Only**: Only segments belonging to entries with `parse_status = 'parsed'` are counted. Unparsed or failed entries contribute zero minutes and are treated as unlogged.

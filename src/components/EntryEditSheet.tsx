@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from './Button';
+import { PainRating } from './PainRating';
 import { toDateTimeLocalValue, fromDateTimeLocalValue, formatDuration } from '../lib/time';
 import './EntryEditSheet.css';
 
@@ -72,6 +73,8 @@ export interface EntryEditSheetProps {
     }
   ) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  currentRating?: { id: string; rating: number; rated_at: string } | null;
+  onSaveRating?: (entryId: string, ratingId: string | undefined, newRating: number | null) => Promise<void>;
 }
 
 export const EntryEditSheet: React.FC<EntryEditSheetProps> = ({
@@ -80,11 +83,15 @@ export const EntryEditSheet: React.FC<EntryEditSheetProps> = ({
   onClose,
   onSave,
   onDelete,
+  currentRating,
+  onSaveRating,
 }) => {
   const [text, setText] = useState('');
   const [startVal, setStartVal] = useState('');
   const [endVal, setEndVal] = useState('');
   const [onVacation, setOnVacation] = useState(false);
+  const [ratingVal, setRatingVal] = useState<number | null>(null);
+  const [showRatingDeleteConfirm, setShowRatingDeleteConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Confirmation states
@@ -101,12 +108,14 @@ export const EntryEditSheet: React.FC<EntryEditSheetProps> = ({
       setStartVal(toDateTimeLocalValue(new Date(entry.window_start)));
       setEndVal(toDateTimeLocalValue(new Date(entry.window_end)));
       setOnVacation(Boolean(entry.on_vacation));
+      setRatingVal(currentRating?.rating ?? null);
+      setShowRatingDeleteConfirm(false);
       setError(null);
       setShowDeleteConfirm(false);
       setNeedsLongWindowConfirm(false);
       setPendingDuration('');
     }
-  }, [entry, isOpen]);
+  }, [entry, isOpen, currentRating]);
 
   if (!isOpen || !entry) return null;
 
@@ -161,6 +170,9 @@ export const EntryEditSheet: React.FC<EntryEditSheetProps> = ({
         window_end: e.toISOString(),
         on_vacation: onVacation,
       });
+      if (onSaveRating && ratingVal !== (currentRating?.rating ?? null)) {
+        await onSaveRating(entry.id, currentRating?.id, ratingVal);
+      }
       onClose();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
@@ -168,6 +180,14 @@ export const EntryEditSheet: React.FC<EntryEditSheetProps> = ({
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleRatingChange = (newVal: number | null) => {
+    if (newVal === null && currentRating) {
+      setShowRatingDeleteConfirm(true);
+      return;
+    }
+    setRatingVal(newVal);
   };
 
   const handleConfirmDelete = async () => {
@@ -368,6 +388,50 @@ export const EntryEditSheet: React.FC<EntryEditSheetProps> = ({
                 aria-label="On vacation"
               />
             </div>
+
+            {/* Milestone 3.7: Rating edit in entry sheet */}
+            {(currentRating || ratingVal !== null) && (
+              <div
+                className="sheet-field"
+                style={{
+                  marginTop: 14,
+                  paddingTop: 12,
+                  borderTop: '1px solid rgba(184, 114, 127, 0.2)',
+                }}
+              >
+                <PainRating
+                  value={ratingVal}
+                  onChange={handleRatingChange}
+                  disabled={saving}
+                />
+              </div>
+            )}
+
+            {showRatingDeleteConfirm && (
+              <div className="entry-delete-confirm-box" style={{ marginTop: 12 }}>
+                <p className="entry-delete-confirm-text">Delete this rating?</p>
+                <p className="entry-delete-confirm-sub">Clearing the rating will remove it.</p>
+                <div className="sheet-button-row">
+                  <Button
+                    variant="secondary"
+                    type="button"
+                    onClick={() => setShowRatingDeleteConfirm(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    type="button"
+                    onClick={() => {
+                      setRatingVal(null);
+                      setShowRatingDeleteConfirm(false);
+                    }}
+                  >
+                    Delete
+                  </Button>
+                </div>
+              </div>
+            )}
 
             <div className="sheet-actions" style={{ marginTop: 22 }}>
               <Button

@@ -1,0 +1,128 @@
+.pain-rating-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  margin: 12px 0 6px 0;
+}
+
+.pain-rating-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+}
+
+.pain-rating-label {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 16px;
+  color: var(--ink);
+  text-align: center;
+}
+
+.pain-rating-guide-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--rose-deep);
+  background-color: var(--surface);
+  color: var(--mauve);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: all var(--transition-fast);
+}
+
+.pain-rating-guide-btn:hover {
+  background-color: var(--rose);
+  color: var(--ink);
+}
+
+.pain-rating-buttons {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 320px;
+  gap: 8px;
+  outline: none;
+}
+
+.pain-rating-buttons:focus-visible {
+  outline: 2px solid var(--gold);
+  border-radius: 999px;
+}
+
+.pain-rating-btn {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
+  border-radius: 50%;
+  border: 1.5px solid var(--rose-deep);
+  background-color: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  box-shadow: 0 2px 5px rgba(75, 51, 64, 0.05);
+  box-sizing: border-box;
+}
+
+.pain-rating-btn:hover:not(:disabled) {
+  border-color: var(--mauve);
+  transform: translateY(-1px);
+}
+
+.pain-rating-btn.selected {
+  background-color: var(--mauve);
+  color: var(--surface);
+  border-color: var(--mauve);
+  box-shadow: 0 2px 8px rgba(142, 107, 122, 0.35);
+}
+
+.pain-rating-btn:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.pain-rating-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pain-rating-word-container {
+  height: 22px;
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.pain-rating-word {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--mauve);
+  text-transform: capitalize;
+}
+
+.pain-rating-word-placeholder {
+  visibility: hidden;
+}

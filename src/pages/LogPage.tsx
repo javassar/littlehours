@@ -8,11 +8,18 @@ import {
   WindowEditSheet,
   ConfirmationSheet,
   SegmentItem,
+  PainRating,
 } from '../components';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { formatWindowSince, formatTime, formatDuration } from '../lib/time';
-import { enqueueEntry, getLatestWindowEnd, getQueue, subscribeToQueue } from '../lib/offlineQueue';
+import {
+  enqueueEntry,
+  enqueueRating,
+  getLatestWindowEnd,
+  getQueue,
+  subscribeToQueue,
+} from '../lib/offlineQueue';
 import { parseEntryInBackground } from '../lib/parse';
 import { STARTER_CATEGORIES } from '../lib/settings';
 import { OverlapAdjustmentsPayload } from '../lib/overlap';
@@ -70,6 +77,10 @@ export const LogPage: React.FC = () => {
 
   // Vacation mode state (read from settings, Milestone 3.7)
   const [vacationMode, setVacationModeState] = useState<boolean>(Boolean(settings?.vacation_mode));
+
+  // Milestone 3.7: Hourly pain rating (1 to 5)
+  const [painRating, setPainRating] = useState<number | null>(null);
+  const [customRatedAt, setCustomRatedAt] = useState<Date | null>(null);
 
   useEffect(() => {
     if (settings?.vacation_mode !== undefined) {
@@ -216,9 +227,12 @@ export const LogPage: React.FC = () => {
     ? `${formatTime(customWindow.start)} – ${formatTime(customWindow.end)}`
     : formatWindowSince(defaultStart);
 
-  // Apply custom window from edit sheet
-  const handleApplyWindow = (newStart: Date, newEnd: Date) => {
+  // Apply custom window and optional custom rated_at from edit sheet
+  const handleApplyWindow = (newStart: Date, newEnd: Date, newRatedAt?: Date) => {
     setCustomWindow({ start: newStart, end: newEnd });
+    if (newRatedAt) {
+      setCustomRatedAt(newRatedAt);
+    }
   };
 
   // Poll for background AI parse completion to open confirmation sheet
@@ -304,13 +318,83 @@ export const LogPage: React.FC = () => {
     }, 2000);
   };
 
-  // Save entry (handles both online save and offline queue)
+  // Save entry and/or pain rating (handles both online save and offline queue)
   const handleSave = async () => {
-    if (isSaving || !text.trim() || !user) return;
+    const hasText = Boolean(text.trim());
+    const hasRating = painRating !== null;
+
+    if (isSaving || (!hasText && !hasRating) || !user) return;
 
     setIsSaving(true);
     setSaveError(null);
 
+    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+
+    // Case 1: Rating ONLY (no text)
+    if (!hasText && hasRating) {
+      const ratingId = crypto.randomUUID();
+      const ratedAtDate = customRatedAt || new Date();
+      const ratingPayload = {
+        id: ratingId,
+        user_id: user.id,
+        entry_id: null,
+        rating: painRating!,
+        rated_at: ratedAtDate.toISOString(),
+        created_at: new Date().toISOString(),
+      };
+
+      if (isOffline) {
+        await enqueueRating(ratingPayload);
+        setPainRating(null);
+        setCustomRatedAt(null);
+        setToastMessage('Saved rating (waiting to sync)');
+        setSparkleActive(true);
+        setToastVisible(true);
+        setTimeout(() => setSparkleActive(false), 700);
+        setIsSaving(false);
+        return;
+      }
+
+      try {
+        const { error } = await supabase.from('pain_ratings').insert(ratingPayload);
+        if (error) {
+          const isNetworkErr =
+            error.message?.toLowerCase().includes('failed to fetch') ||
+            error.message?.toLowerCase().includes('network') ||
+            !navigator.onLine;
+
+          if (isNetworkErr) {
+            await enqueueRating(ratingPayload);
+            setToastMessage('Saved rating (waiting to sync)');
+          } else {
+            setSaveError('We could not save your rating right now. Please try again.');
+            setIsSaving(false);
+            return;
+          }
+        } else {
+          setToastMessage('Saved');
+        }
+
+        setPainRating(null);
+        setCustomRatedAt(null);
+        setSparkleActive(true);
+        setToastVisible(true);
+        setTimeout(() => setSparkleActive(false), 700);
+      } catch {
+        await enqueueRating(ratingPayload);
+        setPainRating(null);
+        setCustomRatedAt(null);
+        setToastMessage('Saved rating (waiting to sync)');
+        setSparkleActive(true);
+        setToastVisible(true);
+        setTimeout(() => setSparkleActive(false), 700);
+      } finally {
+        setIsSaving(false);
+      }
+      return;
+    }
+
+    // Case 2: Text present (with or without rating)
     const startToSave = customWindow ? customWindow.start : defaultStart;
     const endToSave = customWindow ? customWindow.end : new Date();
     const entryId = crypto.randomUUID();
@@ -321,6 +405,7 @@ export const LogPage: React.FC = () => {
       end: endToSave.toISOString(),
       durationMinutes: Math.round((endToSave.getTime() - startToSave.getTime()) / 60000),
       rawText,
+      hasRating,
     });
 
     const entryPayload = {
@@ -335,7 +420,19 @@ export const LogPage: React.FC = () => {
       created_at: new Date().toISOString(),
     };
 
-    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+    let ratingPayload: any = null;
+    if (hasRating) {
+      const ratingId = crypto.randomUUID();
+      const ratedAtDate = customRatedAt || endToSave;
+      ratingPayload = {
+        id: ratingId,
+        user_id: user.id,
+        entry_id: entryId,
+        rating: painRating!,
+        rated_at: ratedAtDate.toISOString(),
+        created_at: new Date().toISOString(),
+      };
+    }
 
     const finalizeSave = (wasOffline: boolean) => {
       setText('');
@@ -346,6 +443,8 @@ export const LogPage: React.FC = () => {
 
       setDefaultStart(endToSave);
       setCustomWindow(null);
+      setPainRating(null);
+      setCustomRatedAt(null);
 
       setLastEntry({
         window_start: startToSave.toISOString(),
@@ -367,8 +466,11 @@ export const LogPage: React.FC = () => {
     };
 
     if (isOffline) {
-      // Store in IndexedDB
+      // Store in IndexedDB (entry first, rating second)
       await enqueueEntry(entryPayload);
+      if (ratingPayload) {
+        await enqueueRating(ratingPayload);
+      }
       finalizeSave(true);
       setIsSaving(false);
       return;
@@ -385,6 +487,9 @@ export const LogPage: React.FC = () => {
 
         if (isNetworkErr) {
           await enqueueEntry(entryPayload);
+          if (ratingPayload) {
+            await enqueueRating(ratingPayload);
+          }
           finalizeSave(true);
         } else {
           setSaveError('We could not save your entry right now. Please check your connection and try again.');
@@ -393,14 +498,26 @@ export const LogPage: React.FC = () => {
         return;
       }
 
+      // If entry saved online and we have a rating, insert rating
+      if (ratingPayload) {
+        const { error: ratingErr } = await supabase.from('pain_ratings').insert(ratingPayload);
+        if (ratingErr) {
+          console.warn('Could not save rating online, enqueuing for sync:', ratingErr.message);
+          await enqueueRating(ratingPayload);
+        }
+      }
+
       finalizeSave(false);
-      // Background AI parsing: saving never waits for it
+      // Background AI parsing: saving never waits for it (pain rating NEVER sent to AI)
       parseEntryInBackground(entryId);
       // Listen for parse completion to show confirmation sheet
       pollForParseCompletion(entryId, rawText);
     } catch {
       // Network exception during fetch
       await enqueueEntry(entryPayload);
+      if (ratingPayload) {
+        await enqueueRating(ratingPayload);
+      }
       finalizeSave(true);
     } finally {
       setIsSaving(false);
@@ -498,7 +615,10 @@ export const LogPage: React.FC = () => {
           <button
             type="button"
             className="window-reset-link"
-            onClick={() => setCustomWindow(null)}
+            onClick={() => {
+              setCustomWindow(null);
+              setCustomRatedAt(null);
+            }}
           >
             Reset
           </button>
@@ -524,15 +644,38 @@ export const LogPage: React.FC = () => {
           aria-label="I was reading a fairy tale, then worked on the garden..."
         />
 
+        {/* Milestone 3.7: PainRating directly below textarea and above Save button */}
+        <div className="log-pain-rating-wrap" style={{ margin: '8px 0 14px 0' }}>
+          <PainRating
+            value={painRating}
+            onChange={setPainRating}
+            disabled={isSaving}
+          />
+        </div>
+
         <div className="log-button-wrap">
           <div style={{ position: 'relative', width: '100%' }}>
             <Button
               fullWidth
               onClick={handleSave}
-              disabled={!text.trim() || isSaving}
-              aria-label={isSaving ? 'Saving entry...' : 'Save Entry'}
+              disabled={(!text.trim() && painRating === null) || isSaving}
+              aria-label={
+                isSaving
+                  ? text.trim()
+                    ? 'Saving entry...'
+                    : 'Saving rating...'
+                  : text.trim()
+                  ? 'Save Entry'
+                  : 'Save Rating'
+              }
             >
-              {isSaving ? 'Saving...' : 'Save'}
+              {isSaving
+                ? text.trim()
+                  ? 'Saving...'
+                  : 'Saving rating...'
+                : text.trim()
+                ? 'Save'
+                : 'Save rating'}
             </Button>
             <SparkleBurst active={sparkleActive} />
           </div>
@@ -562,6 +705,9 @@ export const LogPage: React.FC = () => {
         currentStart={currentStart}
         currentEnd={currentEnd}
         onApply={handleApplyWindow}
+        hasSelectedRating={painRating !== null}
+        currentRatedAt={customRatedAt || undefined}
+        timeZone={timeZone}
       />
 
       {/* Confirmation bottom sheet for newly parsed entry (Milestone 2.3) */}

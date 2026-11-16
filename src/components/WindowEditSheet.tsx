@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from './Button';
-import { toDateTimeLocalValue, fromDateTimeLocalValue, formatDuration } from '../lib/time';
+import { toDateTimeLocalValue, fromDateTimeLocalValue, formatDuration, formatTime } from '../lib/time';
 import './WindowEditSheet.css';
 
 export interface WindowEditSheetProps {
@@ -8,7 +8,10 @@ export interface WindowEditSheetProps {
   onClose: () => void;
   currentStart: Date;
   currentEnd: Date;
-  onApply: (newStart: Date, newEnd: Date) => void;
+  onApply: (newStart: Date, newEnd: Date, newRatedAt?: Date) => void;
+  hasSelectedRating?: boolean;
+  currentRatedAt?: Date;
+  timeZone?: string;
 }
 
 export const WindowEditSheet: React.FC<WindowEditSheetProps> = ({
@@ -17,9 +20,13 @@ export const WindowEditSheet: React.FC<WindowEditSheetProps> = ({
   currentStart,
   currentEnd,
   onApply,
+  hasSelectedRating = false,
+  currentRatedAt,
+  timeZone = 'America/Phoenix',
 }) => {
   const [startVal, setStartVal] = useState('');
   const [endVal, setEndVal] = useState('');
+  const [ratedAtVal, setRatedAtVal] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [needsConfirmation, setNeedsConfirmation] = useState(false);
   const [pendingDuration, setPendingDuration] = useState('');
@@ -29,11 +36,12 @@ export const WindowEditSheet: React.FC<WindowEditSheetProps> = ({
     if (isOpen) {
       setStartVal(toDateTimeLocalValue(currentStart));
       setEndVal(toDateTimeLocalValue(currentEnd));
+      setRatedAtVal(toDateTimeLocalValue(currentRatedAt || new Date()));
       setError(null);
       setNeedsConfirmation(false);
       setPendingDuration('');
     }
-  }, [isOpen, currentStart, currentEnd]);
+  }, [isOpen, currentStart, currentEnd, currentRatedAt]);
 
   if (!isOpen) return null;
 
@@ -68,6 +76,23 @@ export const WindowEditSheet: React.FC<WindowEditSheetProps> = ({
       return;
     }
 
+    let parsedRatedAt: Date | undefined;
+    if (hasSelectedRating && ratedAtVal) {
+      parsedRatedAt = fromDateTimeLocalValue(ratedAtVal);
+      if (isNaN(parsedRatedAt.getTime())) {
+        setError('Please provide a valid hour end time for your rating.');
+        return;
+      }
+      if (parsedRatedAt.getTime() > now.getTime() + 60000) {
+        setError('Hour ends at cannot be set in the future.');
+        return;
+      }
+      if (now.getTime() - parsedRatedAt.getTime() > 24 * 60 * 60 * 1000) {
+        setError('Hour ends at cannot be more than 24 hours in the past.');
+        return;
+      }
+    }
+
     // Rule: if longer than 12 hours, ask for confirmation
     if (durationHours > 12 && !bypassConfirm) {
       setPendingDuration(formatDuration(s, e));
@@ -75,13 +100,23 @@ export const WindowEditSheet: React.FC<WindowEditSheetProps> = ({
       return;
     }
 
-    onApply(s, e);
+    onApply(s, e, parsedRatedAt);
     onClose();
   };
 
   const handleResetToCurrentTime = () => {
     setEndVal(toDateTimeLocalValue(new Date()));
   };
+
+  const handleResetRatedAtToNow = () => {
+    setRatedAtVal(toDateTimeLocalValue(new Date()));
+  };
+
+  // Compute description of hour covered
+  const currentRatedAtDate = ratedAtVal ? fromDateTimeLocalValue(ratedAtVal) : null;
+  const hourCoverageText = currentRatedAtDate && !isNaN(currentRatedAtDate.getTime())
+    ? `Rates ${formatTime(new Date(currentRatedAtDate.getTime() - 60 * 60 * 1000), timeZone)} to ${formatTime(currentRatedAtDate, timeZone)}`
+    : null;
 
   return (
     <div className="sheet-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="sheet-title">
@@ -168,6 +203,49 @@ export const WindowEditSheet: React.FC<WindowEditSheetProps> = ({
                 required
               />
             </div>
+
+            {/* Extra Hour ends at field when a rating is selected (Milestone 3.7) */}
+            {hasSelectedRating && (
+              <div
+                className="sheet-field"
+                style={{
+                  marginTop: 18,
+                  paddingTop: 14,
+                  borderTop: '1px solid rgba(184, 114, 127, 0.2)',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label className="sheet-label" htmlFor="hour-ends-at-input">
+                    Hour ends at (for pain rating)
+                  </label>
+                  <button
+                    type="button"
+                    className="sheet-inline-link"
+                    onClick={handleResetRatedAtToNow}
+                  >
+                    Set to now
+                  </button>
+                </div>
+                <input
+                  id="hour-ends-at-input"
+                  name="rated_at"
+                  type="datetime-local"
+                  className="sheet-datetime-input"
+                  value={ratedAtVal}
+                  onChange={(e) => {
+                    setRatedAtVal(e.target.value);
+                    setError(null);
+                  }}
+                  max={toDateTimeLocalValue(new Date())}
+                  required
+                />
+                {hourCoverageText && (
+                  <span style={{ fontSize: 12, color: 'var(--mauve)', display: 'block', marginTop: 4 }}>
+                    {hourCoverageText}
+                  </span>
+                )}
+              </div>
+            )}
 
             <div className="sheet-actions">
               <Button type="button" variant="secondary" onClick={onClose}>

@@ -3,6 +3,7 @@ import { supabase, isSupabaseConfigured } from './supabase.ts';
 import { parseEntryInBackground } from './parse.ts';
 
 const QUEUE_STORAGE_KEY = 'littlehours_offline_queue';
+const RATINGS_QUEUE_KEY = 'littlehours_offline_ratings_queue';
 
 export interface QueuedEntry {
   id: string;
@@ -18,8 +19,20 @@ export interface QueuedEntry {
   isQueued?: boolean;
 }
 
+export interface QueuedRating {
+  id: string;
+  user_id: string;
+  entry_id?: string | null;
+  rating: number;
+  rated_at: string;
+  created_at: string;
+  queued_at: string;
+  isQueued?: boolean;
+}
+
 // In-memory fallback for environments without IndexedDB (e.g. Node tests)
 let memoryQueueFallback: QueuedEntry[] = [];
+let memoryRatingsFallback: QueuedRating[] = [];
 
 function hasIndexedDB(): boolean {
   return typeof window !== 'undefined' && 'indexedDB' in window;
@@ -28,10 +41,20 @@ function hasIndexedDB(): boolean {
 type QueueListener = (queue: QueuedEntry[]) => void;
 const listeners = new Set<QueueListener>();
 
+type RatingsQueueListener = (queue: QueuedRating[]) => void;
+const ratingsListeners = new Set<RatingsQueueListener>();
+
 export function subscribeToQueue(listener: QueueListener): () => void {
   listeners.add(listener);
   return () => {
     listeners.delete(listener);
+  };
+}
+
+export function subscribeToRatingsQueue(listener: RatingsQueueListener): () => void {
+  ratingsListeners.add(listener);
+  return () => {
+    ratingsListeners.delete(listener);
   };
 }
 
@@ -41,6 +64,16 @@ function notifyListeners(queue: QueuedEntry[]) {
       fn(queue);
     } catch (err) {
       console.error('Error in queue listener:', err);
+    }
+  });
+}
+
+function notifyRatingsListeners(queue: QueuedRating[]) {
+  ratingsListeners.forEach((fn) => {
+    try {
+      fn(queue);
+    } catch (err) {
+      console.error('Error in ratings queue listener:', err);
     }
   });
 }
@@ -113,42 +146,111 @@ export async function dequeueEntry(id: string): Promise<void> {
   }
 }
 
+/**
+ * Milestone 3.7: Get all currently queued offline ratings.
+ */
+export async function getRatingsQueue(): Promise<QueuedRating[]> {
+  try {
+    if (hasIndexedDB()) {
+      const q = await get<QueuedRating[]>(RATINGS_QUEUE_KEY);
+      return q || [];
+    }
+    return [...memoryRatingsFallback];
+  } catch (err) {
+    console.error('Failed to read IndexedDB ratings queue:', err);
+    return [...memoryRatingsFallback];
+  }
+}
+
+/**
+ * Milestone 3.7: Save the entire ratings queue array to IndexedDB.
+ */
+async function saveRatingsQueue(queue: QueuedRating[]): Promise<void> {
+  try {
+    if (hasIndexedDB()) {
+      await set(RATINGS_QUEUE_KEY, queue);
+    } else {
+      memoryRatingsFallback = [...queue];
+    }
+  } catch (err) {
+    console.error('Failed to persist IndexedDB ratings queue:', err);
+    memoryRatingsFallback = [...queue];
+  }
+  notifyRatingsListeners(queue);
+}
+
+/**
+ * Milestone 3.7: Add a new rating to the offline queue.
+ */
+export async function enqueueRating(rating: Omit<QueuedRating, 'queued_at' | 'isQueued'>): Promise<void> {
+  const queue = await getRatingsQueue();
+  const existingIdx = queue.findIndex((r) => r.id === rating.id);
+
+  const queuedRating: QueuedRating = {
+    ...rating,
+    queued_at: new Date().toISOString(),
+    isQueued: true,
+  };
+
+  if (existingIdx >= 0) {
+    queue[existingIdx] = queuedRating;
+  } else {
+    queue.unshift(queuedRating);
+  }
+
+  await saveRatingsQueue(queue);
+}
+
+/**
+ * Milestone 3.7: Remove a rating from the queue by ID.
+ */
+export async function dequeueRating(id: string): Promise<void> {
+  const queue = await getRatingsQueue();
+  const filtered = queue.filter((r) => r.id !== id);
+  if (filtered.length !== queue.length) {
+    await saveRatingsQueue(filtered);
+  }
+}
+
 let isSyncing = false;
 
 /**
- * Sync all queued entries to Supabase using upsert (so retries never duplicate).
+ * Sync all queued entries and ratings to Supabase using upsert (so retries never duplicate).
+ * Milestone 3.7: Inserts entries first and ratings second, because ratings reference entries.
  */
-export async function syncQueue(onEntrySynced?: (id: string) => void): Promise<{ synced: number; remaining: number }> {
+export async function syncQueue(
+  onEntrySynced?: (id: string) => void,
+  onRatingSynced?: (id: string) => void
+): Promise<{ synced: number; remaining: number }> {
   if (isSyncing) {
     const current = await getQueue();
-    return { synced: 0, remaining: current.length };
+    const currentRatings = await getRatingsQueue();
+    return { synced: 0, remaining: current.length + currentRatings.length };
   }
 
   // If browser reports offline, don't attempt network call
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     const current = await getQueue();
-    return { synced: 0, remaining: current.length };
+    const currentRatings = await getRatingsQueue();
+    return { synced: 0, remaining: current.length + currentRatings.length };
   }
 
   if (!isSupabaseConfigured) {
     const current = await getQueue();
-    return { synced: 0, remaining: current.length };
+    const currentRatings = await getRatingsQueue();
+    return { synced: 0, remaining: current.length + currentRatings.length };
   }
 
   isSyncing = true;
   let syncedCount = 0;
 
   try {
+    // 1. Sync entries first (entries are referenced by ratings)
     const queue = await getQueue();
-    if (queue.length === 0) {
-      return { synced: 0, remaining: 0 };
-    }
-
     const remainingQueue: QueuedEntry[] = [];
 
     for (const entry of queue) {
       try {
-        // Sync with upsert on the entry ID so retries never create a duplicate
         const { error } = await supabase.from('entries').upsert(
           {
             id: entry.id,
@@ -181,7 +283,44 @@ export async function syncQueue(onEntrySynced?: (id: string) => void): Promise<{
     }
 
     await saveQueue(remainingQueue);
-    return { synced: syncedCount, remaining: remainingQueue.length };
+
+    // 2. Sync ratings second (with upsert on ID)
+    const ratingsQueue = await getRatingsQueue();
+    const remainingRatings: QueuedRating[] = [];
+
+    for (const r of ratingsQueue) {
+      try {
+        const { error } = await supabase.from('pain_ratings').upsert(
+          {
+            id: r.id,
+            user_id: r.user_id,
+            entry_id: r.entry_id || null,
+            rating: r.rating,
+            rated_at: r.rated_at,
+            created_at: r.created_at,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'id' }
+        );
+
+        if (error) {
+          console.error(`Error syncing rating ${r.id}:`, error.message);
+          remainingRatings.push(r);
+        } else {
+          syncedCount++;
+          if (onRatingSynced) {
+            onRatingSynced(r.id);
+          }
+        }
+      } catch (err) {
+        console.error(`Network exception syncing rating ${r.id}:`, err);
+        remainingRatings.push(r);
+      }
+    }
+
+    await saveRatingsQueue(remainingRatings);
+
+    return { synced: syncedCount, remaining: remainingQueue.length + remainingRatings.length };
   } finally {
     isSyncing = false;
   }
@@ -256,7 +395,8 @@ export function initOfflineSync(onSynced?: (id: string) => void): () => void {
   // Periodic retry every 30s while queue is not empty
   const interval = setInterval(async () => {
     const q = await getQueue();
-    if (q.length > 0) {
+    const rq = await getRatingsQueue();
+    if (q.length > 0 || rq.length > 0) {
       trigger();
     }
   }, 30000);

@@ -11,11 +11,13 @@ import {
   Hummingbird,
   FlowerSprig,
   Sparkle,
+  PainRating,
 } from '../components';
 
 export const DesignPage: React.FC = () => {
   const [toastVisible, setToastVisible] = useState(false);
   const [sparkleActive, setSparkleActive] = useState(false);
+  const [designPain, setDesignPain] = useState<number | null>(3);
 
   const colors = [
     { token: '--bg', hex: '#F6EDEA', name: 'Page Background' },
@@ -171,6 +173,17 @@ export const DesignPage: React.FC = () => {
             <Chip key={cat} label={cat} />
           ))}
         </div>
+      </section>
+
+      {/* 6.5. Pain Rating Control (Milestone 3.7) */}
+      <section className="design-section">
+        <h3 className="section-title">Hourly Pain Rating Control</h3>
+        <Card>
+          <p style={{ fontSize: 14, color: 'var(--mauve)', marginBottom: 12 }}>
+            Average pain over the past hour on a 1 to 5 scale, with scale anchors guide.
+          </p>
+          <PainRating value={designPain} onChange={setDesignPain} />
+        </Card>
       </section>
 
       {/* 7. Storybook SVG Illustrations */}
