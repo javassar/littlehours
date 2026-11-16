@@ -113,6 +113,87 @@
   margin-bottom: 4px;
 }
 
+/* Overlap Adjustments Warning Section (Milestone 2.5) */
+.confirmation-overlap-section {
+  background-color: rgba(217, 165, 174, 0.15);
+  border: 1px solid rgba(184, 114, 127, 0.35);
+  border-radius: 14px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.confirmation-overlap-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.confirmation-overlap-title {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: 0.02em;
+}
+
+.confirmation-overlap-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.confirmation-overlap-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background-color: rgba(251, 246, 243, 0.7);
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(184, 114, 127, 0.2);
+}
+
+.confirmation-overlap-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.confirmation-overlap-label {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.confirmation-overlap-times {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--mauve);
+  flex-wrap: wrap;
+}
+
+.confirmation-overlap-before {
+  text-decoration: line-through;
+  opacity: 0.85;
+}
+
+.confirmation-overlap-arrow {
+  color: var(--rose-deep);
+  font-weight: 600;
+}
+
+.confirmation-overlap-after {
+  color: var(--ink);
+  font-weight: 500;
+}
+
 /* Individual segment card */
 .confirmation-segment-card {
   background-color: rgba(255, 255, 255, 0.6);

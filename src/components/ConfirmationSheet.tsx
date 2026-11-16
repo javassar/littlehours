@@ -1,12 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from './Button';
 import { Chip } from './Chip';
+import { Sparkle } from './illustrations/Sparkle';
 import { SegmentItem } from './EntryEditSheet';
 import {
   formatDuration,
   toDateTimeLocalValue,
   fromDateTimeLocalValue,
 } from '../lib/time';
+import {
+  computeOverlapAdjustments,
+  OverlapAdjustmentsPayload,
+} from '../lib/overlap';
 import './ConfirmationSheet.css';
 
 export interface ConfirmationSheetProps {
@@ -16,16 +21,23 @@ export interface ConfirmationSheetProps {
   initialSegments: SegmentItem[];
   categories: string[];
   timeZone?: string;
+  existingSegments?: SegmentItem[];
   onClose: () => void;
-  onConfirm: (segments: SegmentItem[]) => Promise<void>;
+  onConfirm: (
+    segments: SegmentItem[],
+    overlapPayload?: OverlapAdjustmentsPayload
+  ) => Promise<void>;
   onSaveUnconfirmed?: (segments: SegmentItem[]) => Promise<void>;
 }
 
 export const ConfirmationSheet: React.FC<ConfirmationSheetProps> = ({
   isOpen,
+  entryId,
   rawText,
   initialSegments,
   categories,
+  timeZone = 'America/Phoenix',
+  existingSegments = [],
   onClose,
   onConfirm,
   onSaveUnconfirmed,
@@ -42,6 +54,27 @@ export const ConfirmationSheet: React.FC<ConfirmationSheetProps> = ({
       );
     }
   }, [isOpen, initialSegments]);
+
+  // Milestone 2.5: Compute overlap adjustments to earlier entries
+  const windowStartIso = segments[0]?.start_time;
+  const windowEndIso = segments[segments.length - 1]?.end_time;
+
+  const overlapResult = useMemo(() => {
+    if (!windowStartIso || !windowEndIso || !existingSegments || existingSegments.length === 0) {
+      return {
+        hasOverlaps: false,
+        displayAdjustments: [],
+        payload: { to_delete: [], to_update: [], to_insert: [] },
+      };
+    }
+    return computeOverlapAdjustments(
+      windowStartIso,
+      windowEndIso,
+      entryId,
+      existingSegments,
+      timeZone
+    );
+  }, [windowStartIso, windowEndIso, entryId, existingSegments, timeZone]);
 
   if (!isOpen) return null;
 
@@ -177,7 +210,7 @@ export const ConfirmationSheet: React.FC<ConfirmationSheetProps> = ({
     setIsSaving(true);
     try {
       const confirmedSegments = segments.map((s) => ({ ...s, confirmed: true }));
-      await onConfirm(confirmedSegments);
+      await onConfirm(confirmedSegments, overlapResult.payload);
       onClose();
     } finally {
       setIsSaving(false);
@@ -242,6 +275,35 @@ export const ConfirmationSheet: React.FC<ConfirmationSheetProps> = ({
           {rawText && (
             <div className="confirmation-raw-text">
               &ldquo;{rawText}&rdquo;
+            </div>
+          )}
+
+          {/* Overlap adjustments note (Milestone 2.5) */}
+          {overlapResult.hasOverlaps && (
+            <div
+              className="confirmation-overlap-section"
+              role="region"
+              aria-label="This changes earlier entries"
+            >
+              <div className="confirmation-overlap-header">
+                <Sparkle size={13} color="var(--rose-deep)" />
+                <span className="confirmation-overlap-title">This changes earlier entries</span>
+              </div>
+              <div className="confirmation-overlap-list">
+                {overlapResult.displayAdjustments.map((adj) => (
+                  <div key={adj.id} className="confirmation-overlap-item">
+                    <div className="confirmation-overlap-item-top">
+                      <span className="confirmation-overlap-label">{adj.activity_label}</span>
+                      <Chip label={adj.category} size="sm" />
+                    </div>
+                    <div className="confirmation-overlap-times">
+                      <span className="confirmation-overlap-before">{adj.beforeTimes}</span>
+                      <span className="confirmation-overlap-arrow">→</span>
+                      <span className="confirmation-overlap-after">{adj.afterTimes}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

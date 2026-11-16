@@ -14,6 +14,7 @@ import { formatWindowSince, formatTime, formatDuration } from '../lib/time';
 import { enqueueEntry, getLatestWindowEnd, getQueue, subscribeToQueue } from '../lib/offlineQueue';
 import { parseEntryInBackground } from '../lib/parse';
 import { STARTER_CATEGORIES } from '../lib/settings';
+import { OverlapAdjustmentsPayload } from '../lib/overlap';
 
 const DRAFT_STORAGE_KEY = 'littlehours_draft_entry';
 
@@ -66,12 +67,13 @@ export const LogPage: React.FC = () => {
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('Saved');
 
-  // Confirmation sheet state (Milestone 2.3)
+  // Confirmation sheet state (Milestone 2.3 & 2.5)
   const [confirmationEntry, setConfirmationEntry] = useState<{
     id: string;
     raw_text: string;
     segments: SegmentItem[];
   } | null>(null);
+  const [existingSegments, setExistingSegments] = useState<SegmentItem[]>([]);
   const [isConfirmationOpen, setIsConfirmationOpen] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -228,6 +230,21 @@ export const LogPage: React.FC = () => {
               (a: any, b: any) =>
                 new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
             );
+
+            // Fetch other segments to check for overlaps (Milestone 2.5)
+            try {
+              const { data: otherSegs } = await supabase
+                .from('segments')
+                .select('id, entry_id, start_time, end_time, activity_label, category, confirmed, model, prompt_version')
+                .neq('entry_id', data.id)
+                .order('start_time', { ascending: false })
+                .limit(100);
+
+              if (otherSegs) setExistingSegments(otherSegs as any[]);
+            } catch (err) {
+              console.warn('Could not load existing segments for overlap check:', err);
+            }
+
             console.log('Opening Review Segments sheet with segments:', sorted);
             setConfirmationEntry({
               id: data.id,
@@ -353,20 +370,39 @@ export const LogPage: React.FC = () => {
     }
   };
 
-  const handleConfirmSegments = async (updatedSegments: SegmentItem[]) => {
-    if (!confirmationEntry) return;
+  const handleConfirmSegments = async (
+    updatedSegments: SegmentItem[],
+    overlapPayload?: OverlapAdjustmentsPayload
+  ) => {
+    if (!confirmationEntry || !user) return;
 
-    for (const s of updatedSegments) {
-      await supabase
-        .from('segments')
-        .update({
-          activity_label: s.activity_label,
-          category: s.category,
-          start_time: s.start_time,
-          end_time: s.end_time,
-          confirmed: true,
-        })
-        .eq('id', s.id);
+    const entryId = confirmationEntry.id;
+    const defaultCat = settings?.categories?.[0] || 'work';
+
+    const newSegmentsPayload = updatedSegments.map((s) => ({
+      id: s.id || crypto.randomUUID(),
+      entry_id: entryId,
+      activity_label: (s.activity_label || 'unlabeled').trim().toLowerCase(),
+      category: s.category || defaultCat,
+      start_time: s.start_time,
+      end_time: s.end_time,
+      confirmed: true,
+      model: s.model || 'manual',
+      prompt_version: s.prompt_version || 'v2',
+    }));
+
+    // Milestone 2.5: Apply new segments and adjustments in one database transaction via Postgres RPC
+    const { error: rpcErr } = await supabase.rpc('apply_segments_with_adjustments', {
+      p_entry_id: entryId,
+      p_new_segments: newSegmentsPayload,
+      p_adjustments: overlapPayload || {},
+    });
+
+    if (rpcErr) {
+      console.error('Error applying segments with adjustments:', rpcErr);
+      setToastMessage(`Error confirming: ${rpcErr.message}`);
+      setToastVisible(true);
+      return;
     }
 
     setToastMessage('Segments confirmed');
@@ -491,6 +527,7 @@ export const LogPage: React.FC = () => {
           initialSegments={confirmationEntry.segments}
           categories={categories}
           timeZone={timeZone}
+          existingSegments={existingSegments}
           onClose={() => {
             setIsConfirmationOpen(false);
             setConfirmationEntry(null);

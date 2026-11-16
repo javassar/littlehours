@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Card,
   Button,
@@ -31,6 +31,7 @@ import {
   dequeueEntry,
   QueuedEntry,
 } from '../lib/offlineQueue';
+import { OverlapAdjustmentsPayload } from '../lib/overlap';
 
 const PAGE_SIZE = 30;
 
@@ -311,19 +312,31 @@ export const HistoryPage: React.FC = () => {
     setIsEditOpen(true);
   };
 
-  const handleConfirmSegments = async (updatedSegments: SegmentItem[]) => {
+  // Milestone 2.5: Gather all existing segments from other entries to check for overlaps
+  const allExistingSegments = useMemo(() => {
+    const list: SegmentItem[] = [];
+    for (const e of entries) {
+      if (Array.isArray(e.segments)) {
+        list.push(...e.segments);
+      }
+    }
+    return list;
+  }, [entries]);
+
+  const handleConfirmSegments = async (
+    updatedSegments: SegmentItem[],
+    overlapPayload?: OverlapAdjustmentsPayload
+  ) => {
     if (!selectedConfirmationEntry || !user) return;
 
     const entryId = selectedConfirmationEntry.id;
+    const defaultCat = settings?.categories?.[0] || 'work';
 
-    // Delete previous segments and insert updated segments
-    await supabase.from('segments').delete().eq('entry_id', entryId);
-    const toInsert = updatedSegments.map((s) => ({
+    const newSegmentsPayload = updatedSegments.map((s) => ({
       id: s.id || crypto.randomUUID(),
       entry_id: entryId,
-      user_id: user.id,
       activity_label: (s.activity_label || 'unlabeled').trim().toLowerCase(),
-      category: s.category || (settings?.categories?.[0] || 'work'),
+      category: s.category || defaultCat,
       start_time: s.start_time,
       end_time: s.end_time,
       confirmed: true,
@@ -331,29 +344,21 @@ export const HistoryPage: React.FC = () => {
       prompt_version: s.prompt_version || 'v2',
     }));
 
-    const { error: insErr } = await supabase.from('segments').insert(toInsert);
-    if (insErr) {
-      showToast(`Error saving segments: ${insErr.message}`);
+    // Milestone 2.5: Apply new segments and adjustments in one database transaction via Postgres RPC
+    const { error: rpcErr } = await supabase.rpc('apply_segments_with_adjustments', {
+      p_entry_id: entryId,
+      p_new_segments: newSegmentsPayload,
+      p_adjustments: overlapPayload || {},
+    });
+
+    if (rpcErr) {
+      console.error('Error applying segments with adjustments:', rpcErr);
+      showToast(`Error saving segments: ${rpcErr.message}`);
       return;
     }
 
-    // Set entry parse_status to 'parsed' and clear clarification_question
-    await supabase
-      .from('entries')
-      .update({
-        parse_status: 'parsed',
-        clarification_question: null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', entryId);
-
-    setEntries((prev) =>
-      prev.map((e) =>
-        e.id === entryId
-          ? { ...e, parse_status: 'parsed', clarification_question: null, segments: toInsert }
-          : e
-      )
-    );
+    // Refresh history entries from database to reflect all updated segments
+    await fetchEntries(0, false);
     showToast('Segments confirmed');
   };
 
@@ -824,6 +829,7 @@ export const HistoryPage: React.FC = () => {
           ]
         }
         timeZone={timeZone}
+        existingSegments={allExistingSegments}
         onClose={() => {
           setIsConfirmationOpen(false);
           setSelectedConfirmationEntry(null);
