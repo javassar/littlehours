@@ -658,6 +658,100 @@
   margin-top: 6px;
 }
 
+/* Milestone 3.1: Push Reminders in Settings */
+.reminders-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.reminders-status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.reminders-status-pill.status-on {
+  background-color: rgba(147, 169, 142, 0.2);
+  color: #3b5c34;
+  border: 1px solid rgba(147, 169, 142, 0.4);
+}
+
+.reminders-status-pill.status-off {
+  background-color: var(--surface-sunk);
+  color: var(--slate);
+  border: 1px solid rgba(184, 114, 127, 0.2);
+}
+
+.reminders-status-pill.status-blocked {
+  background-color: rgba(168, 50, 66, 0.1);
+  color: var(--danger);
+  border: 1px solid rgba(168, 50, 66, 0.3);
+}
+
+.reminders-status-pill.status-browser {
+  background-color: rgba(226, 179, 138, 0.2);
+  color: #7b4f2c;
+  border: 1px solid rgba(226, 179, 138, 0.4);
+}
+
+.reminders-standalone-guide {
+  margin-top: 12px;
+  padding: 14px 16px;
+  background-color: var(--surface-sunk);
+  border-radius: 16px;
+  border: 1px solid rgba(184, 114, 127, 0.2);
+}
+
+.reminders-guide-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--ink);
+  margin: 0 0 8px;
+}
+
+.reminders-steps-list {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.reminders-steps-list li {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--ink);
+  line-height: 1.4;
+}
+
+.reminders-guide-note {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--mauve);
+  margin: 10px 0 0;
+}
+
+.reminders-blocked-box {
+  margin-top: 12px;
+  padding: 12px 14px;
+  background-color: rgba(168, 50, 66, 0.06);
+  border: 1px solid rgba(168, 50, 66, 0.25);
+  border-radius: 14px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--ink);
+  line-height: 1.45;
+}
+
 .settings-footer {
   display: flex;
   flex-direction: column;

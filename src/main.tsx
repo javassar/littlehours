@@ -19,6 +19,10 @@ import './styles/layout.css';
 
 import App from './App';
 import { AuthProvider } from './lib/auth';
+import { registerSW } from 'virtual:pwa-register';
+
+// Register service worker for offline support and push notifications
+registerSW({ immediate: true });
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

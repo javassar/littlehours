@@ -13,6 +13,12 @@ import {
 } from '../lib/export';
 import { getQueue } from '../lib/offlineQueue';
 import { STARTER_CATEGORIES, getPromptVersionStats } from '../lib/settings';
+import {
+  getPushStatus,
+  subscribeToPush,
+  unsubscribeFromPush,
+  PushStatus,
+} from '../lib/push';
 
 export const SettingsPage: React.FC = () => {
   const { user, settings, signOut, refreshSettings } = useAuth();
@@ -67,6 +73,25 @@ export const SettingsPage: React.FC = () => {
   const [exporting, setExporting] = useState<'csv' | 'json' | null>(null);
   const [exportStatus, setExportStatus] = useState<string | null>(null);
 
+  // Push reminders state (Milestone 3.1)
+  const [pushStatus, setPushStatus] = useState<PushStatus>({
+    isStandalone: false,
+    permission: 'default',
+    isSubscribed: false,
+  });
+  const [pushBusy, setPushBusy] = useState(false);
+
+  const loadPushStatus = async () => {
+    if (user) {
+      const status = await getPushStatus(user.id);
+      setPushStatus(status);
+    }
+  };
+
+  useEffect(() => {
+    loadPushStatus();
+  }, [user?.id]);
+
   // Toast feedback
   const [toastMessage, setToastMessage] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
@@ -85,6 +110,38 @@ export const SettingsPage: React.FC = () => {
     setCategories(newCats);
     if (refreshSettings) {
       refreshSettings();
+    }
+  };
+
+  const handleToggleReminders = async () => {
+    if (!user) return;
+    setPushBusy(true);
+
+    try {
+      if (pushStatus.isSubscribed) {
+        const res = await unsubscribeFromPush(user.id);
+        if (res.success) {
+          showToast('Reminders turned off');
+        } else {
+          showToast(res.error || 'Failed to turn off reminders');
+        }
+      } else {
+        const res = await subscribeToPush(user.id);
+        if (res.success) {
+          showToast('Reminders turned on');
+        } else if (res.error) {
+          showToast(res.error);
+        }
+      }
+
+      await loadPushStatus();
+      if (refreshSettings) {
+        await refreshSettings();
+      }
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : 'Error updating reminders');
+    } finally {
+      setPushBusy(false);
     }
   };
 
@@ -534,13 +591,114 @@ export const SettingsPage: React.FC = () => {
         </div>
       </Card>
 
+      {/* Push Reminders (Milestone 3.1) */}
+      <Card className="settings-card mb-4">
+        <div className="reminders-status-row">
+          <h3 className="section-title" style={{ margin: 0 }}>
+            Push Reminders
+          </h3>
+          <span
+            className={`reminders-status-pill status-${
+              !pushStatus.isStandalone
+                ? 'browser'
+                : pushStatus.permission === 'denied'
+                ? 'blocked'
+                : pushStatus.isSubscribed
+                ? 'on'
+                : 'off'
+            }`}
+          >
+            {!pushStatus.isStandalone
+              ? 'Browser Tab'
+              : pushStatus.permission === 'denied'
+              ? 'Blocked'
+              : pushStatus.isSubscribed
+              ? 'On'
+              : 'Off'}
+          </span>
+        </div>
+        <p className="section-desc" style={{ marginBottom: 12 }}>
+          Hourly notifications from 8 AM to 11 PM that open directly to your log screen.
+        </p>
+
+        {!pushStatus.isStandalone ? (
+          /* When in a normal Safari tab, show install explanation */
+          <div className="reminders-standalone-guide">
+            <h4 className="reminders-guide-title">Add Little Hours to your Home Screen</h4>
+            <p className="section-desc" style={{ marginBottom: 10, fontSize: 14 }}>
+              iPhone only allows web push notifications for apps installed to your Home Screen:
+            </p>
+            <ol className="reminders-steps-list">
+              <li>
+                Tap the <strong>Share</strong> button (the square with an arrow pointing up) at the
+                bottom of Safari.
+              </li>
+              <li>
+                Scroll down the menu and tap <strong>Add to Home Screen</strong>.
+              </li>
+              <li>
+                Open <strong>Little Hours</strong> from your Home Screen to turn on reminders.
+              </li>
+            </ol>
+            <p className="reminders-guide-note">
+              Once opened from your Home Screen, the &ldquo;Turn on reminders&rdquo; button will
+              appear here.
+            </p>
+          </div>
+        ) : pushStatus.permission === 'denied' ? (
+          /* When notifications are blocked in system settings */
+          <div className="reminders-blocked-box">
+            <strong>Notifications are blocked in your device settings.</strong>
+            <p style={{ margin: '6px 0 0' }}>
+              To enable reminders, open your device{' '}
+              <strong>Settings &gt; Safari (or Little Hours) &gt; Notifications</strong>, turn on{' '}
+              <strong>Allow Notifications</strong>, and reload this screen.
+            </p>
+          </div>
+        ) : pushStatus.isSubscribed ? (
+          /* When reminders are on */
+          <div>
+            <p
+              className="section-desc"
+              style={{ marginBottom: 14, color: '#3b5c34', fontWeight: 500 }}
+            >
+              Reminders are turned on. You will receive an hourly check-in between 8 AM and 11 PM.
+            </p>
+            <Button
+              variant="secondary"
+              onClick={handleToggleReminders}
+              disabled={pushBusy}
+              aria-label="Turn off reminders"
+            >
+              {pushBusy ? 'Updating...' : 'Turn off reminders'}
+            </Button>
+          </div>
+        ) : (
+          /* When reminders are off */
+          <div>
+            <p className="section-desc" style={{ marginBottom: 14 }}>
+              Tap below to grant notification permission and receive hourly check-ins.
+            </p>
+            <Button
+              onClick={handleToggleReminders}
+              disabled={pushBusy}
+              aria-label="Turn on reminders"
+            >
+              {pushBusy ? 'Turning on...' : 'Turn on reminders'}
+            </Button>
+          </div>
+        )}
+      </Card>
+
       {/* Preferences & Default Timezone */}
       <Card className="settings-card mb-4">
         <h3 className="section-title">Preferences</h3>
         <p className="section-desc" style={{ marginBottom: 8 }}>
           Timezone: <strong>{timeZone}</strong>
         </p>
-        <p className="section-desc">Push reminders will appear here in Stage 3.</p>
+        <p className="section-desc">
+          Schedule settings (quiet hours, snooze) will appear in Milestone 3.4.
+        </p>
       </Card>
 
       <div style={{ marginTop: 24, textAlign: 'center' }}>
