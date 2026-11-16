@@ -101,3 +101,18 @@ npm run preview
 - [x] **Milestone 1.5**: Offline saving and sync via IndexedDB (`idb-keyval`).
 - [x] **Milestone 1.6**: CSV & JSON export with date range filtering and RFC 4180 escaping.
 - [x] **Milestone 1.7**: Installable PWA web app manifest, service worker shell precache, Safari banner, and Vercel deployment.
+
+### Stage 2: AI Parsing
+- [x] **Milestone 2.1**: Gemini AI parsing via Supabase Edge Function (`parse-entry`) with structured output validation.
+- [x] **Milestone 2.2**: Non-blocking background parsing on save with rotating sparkle indicator and segment chips in History.
+- [x] **Milestone 2.3**: Segment confirmation sheet with adjacent boundary adjustments and unconfirmed tags.
+- [x] **Milestone 2.4**: Clarification follow-up questions with conversational roundtrip answers without touching raw text.
+- [x] **Milestone 2.5**: Automatic segment overlap reconciliation (trimming and splitting) via transactional RPC.
+- [x] **Milestone 2.6**: Category management (add, rename, reorder, delete protection), batch re-reading, and export with segments.
+
+### Stage 3: Push Reminders
+- [x] **Milestone 3.1**: VAPID keys, push subscription management, standalone PWA detection, and Settings UI.
+- [x] **Milestone 3.2**: Service worker push event handling (`tag: 'hourly'` replacement) and notification click auto-focus (`/?focus=1`).
+- [x] **Milestone 3.3**: Hourly sender Edge Function (`send-reminders`), quiet hours enforcement (8 AM - 11 PM), subscription pruning (404/410), and `pg_cron` schedule.
+- [x] **Milestone 3.4**: Reminder schedule controls, 1-hour snooze support, test reminder trigger, and friendly next reminder calculations.
+- [x] **Milestone 3.5**: Intelligent skip when user has logged within the last 30 minutes, with detailed logging of skip reasons.

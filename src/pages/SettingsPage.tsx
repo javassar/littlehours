@@ -100,7 +100,7 @@ export const SettingsPage: React.FC = () => {
     loadPushStatus();
   }, [user?.id]);
 
-  // Reminders state (Milestone 3.4)
+  // Reminders state (Milestone 3.4 & 3.5)
   const [remindersEnabled, setRemindersEnabled] = useState<boolean>(
     settings?.reminders_enabled !== false
   );
@@ -108,8 +108,31 @@ export const SettingsPage: React.FC = () => {
   const [endHour, setEndHour] = useState<number>(settings?.reminder_end_hour ?? 23);
   const [userTimezone, setUserTimezone] = useState<string>(settings?.timezone || 'America/Phoenix');
   const [snoozeUntil, setSnoozeUntil] = useState<string | null>(settings?.snooze_until || null);
+  const [latestEntryEnd, setLatestEntryEnd] = useState<string | null>(null);
   const [sendingTest, setSendingTest] = useState(false);
   const [snoozing, setSnoozing] = useState(false);
+
+  useEffect(() => {
+    if (user?.id) {
+      (async () => {
+        try {
+          const { data } = await supabase
+            .from('entries')
+            .select('window_end')
+            .eq('user_id', user.id)
+            .order('window_end', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (data?.window_end) {
+            setLatestEntryEnd(data.window_end);
+          }
+        } catch {
+          // Ignore
+        }
+      })();
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     if (settings) {
@@ -143,13 +166,17 @@ export const SettingsPage: React.FC = () => {
 
   const isSnoozed = Boolean(snoozeUntil && new Date(snoozeUntil) > new Date());
 
-  const nextReminderDate = computeNextReminderTime({
-    reminders_enabled: remindersEnabled,
-    timezone: userTimezone,
-    reminder_start_hour: startHour,
-    reminder_end_hour: endHour,
-    snooze_until: snoozeUntil,
-  });
+  const nextReminderDate = computeNextReminderTime(
+    {
+      reminders_enabled: remindersEnabled,
+      timezone: userTimezone,
+      reminder_start_hour: startHour,
+      reminder_end_hour: endHour,
+      snooze_until: snoozeUntil,
+    },
+    new Date(),
+    latestEntryEnd
+  );
 
   const nextReminderText = nextReminderDate
     ? formatFriendlyTime(nextReminderDate, userTimezone)
@@ -289,7 +316,11 @@ export const SettingsPage: React.FC = () => {
     setSendingTest(true);
     try {
       const { data, error } = await supabase.functions.invoke('send-reminders', {
-        body: { user_id: user.id, ignore_quiet_hours: true },
+        body: {
+          user_id: user.id,
+          ignore_quiet_hours: true,
+          ignore_recent_log: true,
+        },
       });
 
       if (error) {

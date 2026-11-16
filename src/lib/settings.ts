@@ -280,14 +280,16 @@ export function getLocalHour(date: Date, timeZone: string): number {
 }
 
 /**
- * Milestone 3.4: Compute the next scheduled reminder time based on settings and snooze
+ * Milestone 3.4 & 3.5: Compute the next scheduled reminder time based on settings, snooze,
+ * and whether the user has logged within the last 30 minutes.
  */
 export function computeNextReminderTime(
   settings: Pick<
     UserSettings,
     'reminders_enabled' | 'timezone' | 'reminder_start_hour' | 'reminder_end_hour' | 'snooze_until'
   >,
-  currentTime: Date = new Date()
+  currentTime: Date = new Date(),
+  latestEntryEnd?: string | Date | null
 ): Date | null {
   if (!settings.reminders_enabled) {
     return null;
@@ -320,9 +322,23 @@ export function computeNextReminderTime(
 
   // Search forward for the next hour inside the [startHour, endHour] window
   let iterations = 0;
+  const recentThresholdMs = 30 * 60 * 1000;
+  const entryEndTime = latestEntryEnd ? new Date(latestEntryEnd).getTime() : null;
+
   while (iterations < 72) {
     const hour = getLocalHour(candidate, timeZone);
-    if (hour >= startHour && hour <= endHour) {
+    const inWindow = hour >= startHour && hour <= endHour;
+
+    // Milestone 3.5: If candidate falls within 30 minutes of latest entry, the reminder is skipped
+    let skippedDueToRecentLog = false;
+    if (inWindow && entryEndTime && !isNaN(entryEndTime)) {
+      const diffAtCandidate = candidate.getTime() - entryEndTime;
+      if (diffAtCandidate >= -60_000 && diffAtCandidate <= recentThresholdMs) {
+        skippedDueToRecentLog = true;
+      }
+    }
+
+    if (inWindow && !skippedDueToRecentLog) {
       return candidate;
     }
     candidate.setHours(candidate.getHours() + 1);

@@ -1,6 +1,7 @@
 /**
- * Milestone 3.3: Supabase Edge Function `send-reminders`
+ * Milestone 3.3 & 3.5: Supabase Edge Function `send-reminders`
  * Hourly sender that sends Web Push reminders to users within their active reminder window.
+ * Skips reminders if the user has logged within the last 30 minutes.
  */
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
@@ -35,6 +36,45 @@ export function getLocalHour(date: Date, timeZone: string): number {
     const hour = parseInt(hourStr, 10);
     return hour === 24 ? 0 : hour;
   }
+}
+
+/**
+ * Milestone 3.5: Check if the user's latest entry ended within the last 30 minutes.
+ * If so, the reminder is skipped because the user has already checked in.
+ */
+export interface RecentEntryCheckResult {
+  isRecent: boolean;
+  minutesAgo: number;
+  reason?: string;
+}
+
+export function checkRecentEntry(
+  latestWindowEnd: string | Date | null | undefined,
+  currentTime: Date,
+  thresholdMs: number = 30 * 60 * 1000
+): RecentEntryCheckResult {
+  if (!latestWindowEnd) {
+    return { isRecent: false, minutesAgo: -1 };
+  }
+
+  const endedAt = new Date(latestWindowEnd);
+  if (isNaN(endedAt.getTime())) {
+    return { isRecent: false, minutesAgo: -1 };
+  }
+
+  const diffMs = currentTime.getTime() - endedAt.getTime();
+  // Within the last 30 minutes: endedAt is recent (allowing 60s clock skew) and within threshold
+  if (diffMs >= -60_000 && diffMs <= thresholdMs) {
+    const minutesAgo = Math.max(0, Math.round(diffMs / 60000));
+    return {
+      isRecent: true,
+      minutesAgo,
+      reason: `logged recently (latest entry ended at ${endedAt.toISOString()}, ${minutesAgo}m ago)`,
+    };
+  }
+
+  const minutesAgo = Math.round(diffMs / 60000);
+  return { isRecent: false, minutesAgo };
 }
 
 Deno.serve(async (req: Request) => {
@@ -73,6 +113,7 @@ Deno.serve(async (req: Request) => {
     const targetUserId = body.user_id as string | undefined;
     const testClock = body.test_clock as string | undefined;
     const ignoreQuietHours = Boolean(body.ignore_quiet_hours);
+    const ignoreRecentLog = Boolean(body.ignore_recent_log);
 
     // Use simulated time if provided, otherwise real current time
     const currentTime = testClock ? new Date(testClock) : new Date();
@@ -191,6 +232,33 @@ Deno.serve(async (req: Request) => {
           reason: `quiet hours (${localHour}:00 in ${timeZone})`,
         });
         continue;
+      }
+
+      // Rule 4: Skip when user has just logged within the last 30 minutes (Milestone 3.5)
+      if (!ignoreRecentLog) {
+        const { data: latestEntry, error: entryError } = await supabase
+          .from('entries')
+          .select('id, window_end')
+          .eq('user_id', userId)
+          .order('window_end', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (entryError) {
+          console.warn(`[send-reminders] Could not check recent entries for user ${userId}:`, entryError.message);
+        } else if (latestEntry && latestEntry.window_end) {
+          const recentCheck = checkRecentEntry(latestEntry.window_end, currentTime);
+          if (recentCheck.isRecent) {
+            console.log(
+              `[send-reminders] Skipped user ${userId}: ${recentCheck.reason}`
+            );
+            skippedLog.push({
+              user_id: userId,
+              reason: recentCheck.reason || 'logged recently',
+            });
+            continue;
+          }
+        }
       }
 
       // Send to every subscription for this user
