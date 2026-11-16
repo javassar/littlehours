@@ -9,6 +9,7 @@ export * from './Sparkles';
 export * from './WindowEditSheet';
 export * from './EntryEditSheet';
 export * from './ConfirmationSheet';
+export * from './FollowUpCard';
 export * from './ProtectedRoute';
 export * from './InstallBanner';
 export * from './illustrations';

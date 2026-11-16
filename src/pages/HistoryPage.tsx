@@ -6,9 +6,11 @@ import {
   Toast,
   EntryEditSheet,
   ConfirmationSheet,
+  FollowUpCard,
   RotatingSparkle,
   EntryItem,
   SegmentItem,
+  FollowUpItem,
   TrashIcon,
   Chip,
 } from '../components';
@@ -91,6 +93,7 @@ export const HistoryPage: React.FC = () => {
             window_end,
             parse_status,
             clarification_question,
+            follow_ups,
             created_at,
             segments (
               id,
@@ -174,6 +177,7 @@ export const HistoryPage: React.FC = () => {
           id,
           parse_status,
           clarification_question,
+          follow_ups,
           segments (
             id,
             entry_id,
@@ -198,6 +202,7 @@ export const HistoryPage: React.FC = () => {
               ...item,
               parse_status: updated.parse_status,
               clarification_question: updated.clarification_question,
+              follow_ups: updated.follow_ups || item.follow_ups || [],
               segments: Array.isArray(updated.segments)
                 ? (updated.segments as any[]).sort(
                     (a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
@@ -307,50 +312,148 @@ export const HistoryPage: React.FC = () => {
   };
 
   const handleConfirmSegments = async (updatedSegments: SegmentItem[]) => {
-    if (!selectedConfirmationEntry) return;
+    if (!selectedConfirmationEntry || !user) return;
 
-    for (const s of updatedSegments) {
-      await supabase
-        .from('segments')
-        .update({
-          activity_label: s.activity_label,
-          category: s.category,
-          start_time: s.start_time,
-          end_time: s.end_time,
-          confirmed: true,
-        })
-        .eq('id', s.id);
+    const entryId = selectedConfirmationEntry.id;
+
+    // Delete previous segments and insert updated segments
+    await supabase.from('segments').delete().eq('entry_id', entryId);
+    const toInsert = updatedSegments.map((s) => ({
+      id: s.id || crypto.randomUUID(),
+      entry_id: entryId,
+      user_id: user.id,
+      activity_label: (s.activity_label || 'unlabeled').trim().toLowerCase(),
+      category: s.category || (settings?.categories?.[0] || 'work'),
+      start_time: s.start_time,
+      end_time: s.end_time,
+      confirmed: true,
+      model: s.model || 'manual',
+      prompt_version: s.prompt_version || 'v2',
+    }));
+
+    const { error: insErr } = await supabase.from('segments').insert(toInsert);
+    if (insErr) {
+      showToast(`Error saving segments: ${insErr.message}`);
+      return;
     }
+
+    // Set entry parse_status to 'parsed' and clear clarification_question
+    await supabase
+      .from('entries')
+      .update({
+        parse_status: 'parsed',
+        clarification_question: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', entryId);
 
     setEntries((prev) =>
       prev.map((e) =>
-        e.id === selectedConfirmationEntry.id ? { ...e, segments: updatedSegments } : e
+        e.id === entryId
+          ? { ...e, parse_status: 'parsed', clarification_question: null, segments: toInsert }
+          : e
       )
     );
     showToast('Segments confirmed');
   };
 
   const handleSaveUnconfirmedSegments = async (updatedSegments: SegmentItem[]) => {
-    if (!selectedConfirmationEntry) return;
+    if (!selectedConfirmationEntry || !user) return;
 
-    for (const s of updatedSegments) {
-      await supabase
-        .from('segments')
-        .update({
-          activity_label: s.activity_label,
-          category: s.category,
-          start_time: s.start_time,
-          end_time: s.end_time,
-          confirmed: false,
-        })
-        .eq('id', s.id);
+    const entryId = selectedConfirmationEntry.id;
+
+    await supabase.from('segments').delete().eq('entry_id', entryId);
+    const toInsert = updatedSegments.map((s) => ({
+      id: s.id || crypto.randomUUID(),
+      entry_id: entryId,
+      user_id: user.id,
+      activity_label: (s.activity_label || 'unlabeled').trim().toLowerCase(),
+      category: s.category || (settings?.categories?.[0] || 'work'),
+      start_time: s.start_time,
+      end_time: s.end_time,
+      confirmed: false,
+      model: s.model || 'manual',
+      prompt_version: s.prompt_version || 'v2',
+    }));
+
+    await supabase.from('segments').insert(toInsert);
+
+    await supabase
+      .from('entries')
+      .update({
+        parse_status: 'parsed',
+        clarification_question: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', entryId);
+
+    setEntries((prev) =>
+      prev.map((e) =>
+        e.id === entryId
+          ? { ...e, parse_status: 'parsed', clarification_question: null, segments: toInsert }
+          : e
+      )
+    );
+  };
+
+  // Milestone 2.4: Save follow-up answer (never touches raw_text) and re-evaluates
+  const handleAnswerFollowUp = async (entryId: string, question: string, answer: string) => {
+    if (!user) return;
+    const entry = entries.find((e) => e.id === entryId);
+    if (!entry) return;
+
+    const newFollowUp: FollowUpItem = {
+      question,
+      answer,
+      answered_at: new Date().toISOString(),
+    };
+    const updatedFollowUps = [...(entry.follow_ups || []), newFollowUp];
+
+    // Important: Save answer in entries.follow_ups. Do not touch raw_text!
+    const { error } = await supabase
+      .from('entries')
+      .update({
+        follow_ups: updatedFollowUps,
+        parse_status: 'pending',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', entryId);
+
+    if (error) {
+      showToast(`Error saving answer: ${error.message}`);
+      return;
     }
 
     setEntries((prev) =>
       prev.map((e) =>
-        e.id === selectedConfirmationEntry.id ? { ...e, segments: updatedSegments } : e
+        e.id === entryId
+          ? { ...e, follow_ups: updatedFollowUps, parse_status: 'pending' }
+          : e
       )
     );
+
+    showToast('Answer saved. Re-evaluating with AI...');
+    parseEntryInBackground(entryId);
+  };
+
+  // Milestone 2.4: "Fix it by hand" opens segment editor with one empty row covering the window
+  const handleFixByHand = (entry: EntryItem) => {
+    const defaultCat = (settings?.categories && settings.categories[0]) || 'work';
+    const emptyRow: SegmentItem = {
+      id: crypto.randomUUID(),
+      entry_id: entry.id,
+      start_time: entry.window_start,
+      end_time: entry.window_end,
+      activity_label: '',
+      category: defaultCat,
+      confirmed: false,
+    };
+
+    setSelectedConfirmationEntry({
+      ...entry,
+      segments: [emptyRow],
+    });
+    setIsConfirmationOpen(true);
   };
 
   if (loading) {
@@ -433,6 +536,7 @@ export const HistoryPage: React.FC = () => {
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => {
+                    if (e.target !== e.currentTarget) return;
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
                       handleCardClick(entry);
@@ -512,6 +616,7 @@ export const HistoryPage: React.FC = () => {
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => {
+                      if (e.target !== e.currentTarget) return;
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
                         handleCardClick(entry);
@@ -585,33 +690,6 @@ export const HistoryPage: React.FC = () => {
                       </div>
                     )}
 
-                    {/* 2.5 Clarification question state */}
-                    {entry.parse_status === 'needs_clarification' && entry.clarification_question && (
-                      <div
-                        className="history-card-clarification"
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: 10,
-                          marginTop: 6,
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <span style={{ fontStyle: 'italic', color: 'var(--mauve)', fontSize: 13, flex: 1 }}>
-                          {entry.clarification_question}
-                        </span>
-                        <button
-                          type="button"
-                          className="history-retry-btn"
-                          onClick={() => handleRetryParse(entry.id)}
-                          aria-label="Re-evaluate entry with AI"
-                        >
-                          Re-read
-                        </button>
-                      </div>
-                    )}
-
                     {/* 3. Parsed segments: time range, label, category chip */}
                     {entry.segments && entry.segments.length > 0 && (
                       <div className="history-card-segments">
@@ -632,6 +710,15 @@ export const HistoryPage: React.FC = () => {
                       </div>
                     )}
                   </Card>
+
+                  {/* 2.5 Clarification question state: Milestone 2.4 FollowUpCard under the entry */}
+                  {entry.parse_status === 'needs_clarification' && (
+                    <FollowUpCard
+                      entry={entry}
+                      onAnswer={handleAnswerFollowUp}
+                      onFixByHand={handleFixByHand}
+                    />
+                  )}
 
                   {/* Overlap note */}
                   {isOverlap && (

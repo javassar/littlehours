@@ -234,6 +234,32 @@
   outline-offset: 2px;
 }
 
+/* Row Action Buttons: Split / Merge */
+.confirmation-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.confirmation-row-action-btn {
+  background: transparent;
+  border: 1px dashed rgba(184, 114, 127, 0.4);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: var(--mauve);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.confirmation-row-action-btn:hover {
+  border-color: var(--rose-deep);
+  color: var(--ink);
+  background: rgba(217, 165, 174, 0.1);
+}
+
 /* Shared Boundary Adjustment Control */
 .confirmation-boundary-control {
   display: flex;

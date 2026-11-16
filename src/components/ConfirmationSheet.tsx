@@ -132,6 +132,46 @@ export const ConfirmationSheet: React.FC<ConfirmationSheetProps> = ({
     handleEndChange(boundaryIndex, newLocalDtStr);
   };
 
+  // 5.5 Split segment into two halves
+  const handleSplitSegment = (index: number) => {
+    setSegments((prev) => {
+      const seg = prev[index];
+      const startMs = new Date(seg.start_time).getTime();
+      const endMs = new Date(seg.end_time).getTime();
+      const diffMs = endMs - startMs;
+      if (diffMs < 2 * 60 * 1000) return prev; // At least 2 minutes to split
+
+      const midMs = Math.floor(startMs + diffMs / 2);
+      const midIso = new Date(midMs).toISOString();
+
+      const first = { ...seg, end_time: midIso };
+      const second: SegmentItem = {
+        id: crypto.randomUUID(),
+        entry_id: seg.entry_id,
+        start_time: midIso,
+        end_time: seg.end_time,
+        activity_label: '',
+        category: categories[0] || 'work',
+        confirmed: false,
+      };
+
+      const copy = [...prev];
+      copy.splice(index, 1, first, second);
+      return copy;
+    });
+  };
+
+  // 5.6 Merge segment with next row
+  const handleMergeWithNext = (index: number) => {
+    setSegments((prev) => {
+      if (index >= prev.length - 1) return prev;
+      const copy = [...prev];
+      copy[index] = { ...copy[index], end_time: copy[index + 1].end_time };
+      copy.splice(index + 1, 1);
+      return copy;
+    });
+  };
+
   // 6. "Looks right" sets confirmed = true and saves
   const handleLooksRight = async () => {
     setIsSaving(true);
@@ -283,6 +323,28 @@ export const ConfirmationSheet: React.FC<ConfirmationSheetProps> = ({
                         </option>
                       ))}
                     </select>
+                  </div>
+
+                  {/* Row actions: Split row / Merge with next */}
+                  <div className="confirmation-row-actions">
+                    <button
+                      type="button"
+                      className="confirmation-row-action-btn"
+                      onClick={() => handleSplitSegment(idx)}
+                      title="Split this row into two halves"
+                    >
+                      + Split into 2
+                    </button>
+                    {segments.length > 1 && idx < segments.length - 1 && (
+                      <button
+                        type="button"
+                        className="confirmation-row-action-btn"
+                        onClick={() => handleMergeWithNext(idx)}
+                        title="Merge this row with the next row"
+                      >
+                        Merge with next
+                      </button>
+                    )}
                   </div>
                 </div>
 

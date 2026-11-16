@@ -204,6 +204,13 @@ Deno.serve(async (req: Request) => {
     candidateModels = Array.from(new Set(candidateModels.filter(Boolean))).slice(0, 3);
     console.log('Candidate models to attempt (max 3):', candidateModels);
 
+    const followUpsList = Array.isArray(entry.follow_ups) ? entry.follow_ups : [];
+    const followUpsFormatted = followUpsList.map((f: any, idx: number) => ({
+      round: idx + 1,
+      question: f.question,
+      answer: f.answer,
+    }));
+
     const initialUserPayload = {
       raw_text: entry.raw_text,
       window_start: entry.window_start,
@@ -211,7 +218,7 @@ Deno.serve(async (req: Request) => {
       timezone: timeZone,
       category_list: categories,
       labels_used: labelsUsed,
-      follow_ups: entry.follow_ups || [],
+      follow_ups: followUpsFormatted,
     };
 
     let usedModel = candidateModels[0];

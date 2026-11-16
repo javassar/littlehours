@@ -15,6 +15,12 @@ export interface SegmentItem {
   prompt_version?: string;
 }
 
+export interface FollowUpItem {
+  question: string;
+  answer: string;
+  answered_at: string;
+}
+
 export interface EntryItem {
   id: string;
   raw_text: string;
@@ -22,6 +28,7 @@ export interface EntryItem {
   window_end: string;
   parse_status?: 'pending' | 'parsed' | 'needs_clarification' | 'failed';
   clarification_question?: string | null;
+  follow_ups?: FollowUpItem[];
   segments?: SegmentItem[];
   created_at: string;
 }
