@@ -12,11 +12,19 @@ import {
   ExportEntry,
 } from '../lib/export';
 import { getQueue } from '../lib/offlineQueue';
-import { STARTER_CATEGORIES, getPromptVersionStats } from '../lib/settings';
+import {
+  STARTER_CATEGORIES,
+  getPromptVersionStats,
+  COMMON_TIMEZONES,
+  updateUserSettings,
+  snoozeReminders,
+  cancelSnooze,
+  computeNextReminderTime,
+  formatFriendlyTime,
+} from '../lib/settings';
 import {
   getPushStatus,
   subscribeToPush,
-  unsubscribeFromPush,
   PushStatus,
 } from '../lib/push';
 
@@ -92,6 +100,70 @@ export const SettingsPage: React.FC = () => {
     loadPushStatus();
   }, [user?.id]);
 
+  // Reminders state (Milestone 3.4)
+  const [remindersEnabled, setRemindersEnabled] = useState<boolean>(
+    settings?.reminders_enabled !== false
+  );
+  const [startHour, setStartHour] = useState<number>(settings?.reminder_start_hour ?? 8);
+  const [endHour, setEndHour] = useState<number>(settings?.reminder_end_hour ?? 23);
+  const [userTimezone, setUserTimezone] = useState<string>(settings?.timezone || 'America/Phoenix');
+  const [snoozeUntil, setSnoozeUntil] = useState<string | null>(settings?.snooze_until || null);
+  const [sendingTest, setSendingTest] = useState(false);
+  const [snoozing, setSnoozing] = useState(false);
+
+  useEffect(() => {
+    if (settings) {
+      setRemindersEnabled(settings.reminders_enabled !== false);
+      setStartHour(
+        typeof settings.reminder_start_hour === 'number' ? settings.reminder_start_hour : 8
+      );
+      setEndHour(
+        typeof settings.reminder_end_hour === 'number' ? settings.reminder_end_hour : 23
+      );
+      setUserTimezone(settings.timezone || 'America/Phoenix');
+      setSnoozeUntil(settings.snooze_until || null);
+    }
+  }, [settings]);
+
+  const availableTimezones = React.useMemo(() => {
+    const list = [...COMMON_TIMEZONES];
+    try {
+      const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      if (localTz && !list.includes(localTz)) {
+        list.unshift(localTz);
+      }
+    } catch {
+      // Ignore
+    }
+    if (userTimezone && !list.includes(userTimezone)) {
+      list.unshift(userTimezone);
+    }
+    return list;
+  }, [userTimezone]);
+
+  const isSnoozed = Boolean(snoozeUntil && new Date(snoozeUntil) > new Date());
+
+  const nextReminderDate = computeNextReminderTime({
+    reminders_enabled: remindersEnabled,
+    timezone: userTimezone,
+    reminder_start_hour: startHour,
+    reminder_end_hour: endHour,
+    snooze_until: snoozeUntil,
+  });
+
+  const nextReminderText = nextReminderDate
+    ? formatFriendlyTime(nextReminderDate, userTimezone)
+    : null;
+
+  const snoozeTimeFormatted =
+    isSnoozed && snoozeUntil
+      ? new Intl.DateTimeFormat('en-US', {
+          timeZone: userTimezone,
+          hour: 'numeric',
+          minute: '2-digit',
+        }).format(new Date(snoozeUntil))
+      : null;
+
   // Toast feedback
   const [toastMessage, setToastMessage] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
@@ -113,36 +185,134 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleToggleReminders = async () => {
+  const handleToggleSwitch = async (checked: boolean) => {
     if (!user) return;
+    setRemindersEnabled(checked);
     setPushBusy(true);
 
     try {
-      if (pushStatus.isSubscribed) {
-        const res = await unsubscribeFromPush(user.id);
-        if (res.success) {
-          showToast('Reminders turned off');
+      if (checked) {
+        if (!pushStatus.isSubscribed) {
+          const res = await subscribeToPush(user.id);
+          if (!res.success) {
+            setRemindersEnabled(false);
+            showToast(res.error || 'Failed to enable reminders');
+            setPushBusy(false);
+            return;
+          }
         } else {
-          showToast(res.error || 'Failed to turn off reminders');
+          await updateUserSettings(user.id, { reminders_enabled: true });
         }
+        showToast('Reminders turned on');
       } else {
-        const res = await subscribeToPush(user.id);
-        if (res.success) {
-          showToast('Reminders turned on');
-        } else if (res.error) {
-          showToast(res.error);
-        }
+        await updateUserSettings(user.id, { reminders_enabled: false });
+        showToast('Reminders turned off');
       }
 
       await loadPushStatus();
-      if (refreshSettings) {
-        await refreshSettings();
-      }
+      if (refreshSettings) await refreshSettings();
     } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : 'Error updating reminders');
+      showToast(err instanceof Error ? err.message : 'Failed to update reminders');
     } finally {
       setPushBusy(false);
     }
+  };
+
+  const handleTimezoneChange = async (newTz: string) => {
+    if (!user) return;
+    setUserTimezone(newTz);
+    try {
+      await updateUserSettings(user.id, { timezone: newTz });
+      showToast(`Timezone updated to ${newTz}`);
+      if (refreshSettings) await refreshSettings();
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : 'Failed to update timezone');
+    }
+  };
+
+  const handleStartHourChange = async (h: number) => {
+    if (!user) return;
+    setStartHour(h);
+    try {
+      await updateUserSettings(user.id, { reminder_start_hour: h });
+      if (refreshSettings) await refreshSettings();
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : 'Failed to update start hour');
+    }
+  };
+
+  const handleEndHourChange = async (h: number) => {
+    if (!user) return;
+    setEndHour(h);
+    try {
+      await updateUserSettings(user.id, { reminder_end_hour: h });
+      if (refreshSettings) await refreshSettings();
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : 'Failed to update end hour');
+    }
+  };
+
+  const handleSnooze = async () => {
+    if (!user) return;
+    setSnoozing(true);
+    try {
+      const until = await snoozeReminders(user.id, 60);
+      setSnoozeUntil(until);
+      showToast('Snoozed reminders for 1 hour');
+      if (refreshSettings) await refreshSettings();
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : 'Failed to snooze reminders');
+    } finally {
+      setSnoozing(false);
+    }
+  };
+
+  const handleCancelSnooze = async () => {
+    if (!user) return;
+    try {
+      await cancelSnooze(user.id);
+      setSnoozeUntil(null);
+      showToast('Snooze cancelled');
+      if (refreshSettings) await refreshSettings();
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : 'Failed to cancel snooze');
+    }
+  };
+
+  const handleSendTestReminder = async () => {
+    if (!user) return;
+    if (!pushStatus.isSubscribed) {
+      showToast('Turn on reminders first to register your device');
+      return;
+    }
+
+    setSendingTest(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-reminders', {
+        body: { user_id: user.id, ignore_quiet_hours: true },
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (data && data.notifications_sent > 0) {
+        showToast('Test reminder sent! Check your notification tray');
+      } else {
+        showToast('Test reminder processed');
+      }
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : 'Failed to send test reminder');
+    } finally {
+      setSendingTest(false);
+    }
+  };
+
+  const formatHourLabel = (h: number): string => {
+    if (h === 0) return '12:00 AM (midnight)';
+    if (h === 12) return '12:00 PM (noon)';
+    if (h < 12) return `${h}:00 AM`;
+    return `${h - 12}:00 PM`;
   };
 
   const handleReReadAllEntries = async () => {
@@ -591,11 +761,11 @@ export const SettingsPage: React.FC = () => {
         </div>
       </Card>
 
-      {/* Push Reminders (Milestone 3.1) */}
+      {/* Reminders Section (Milestone 3.1 & 3.4) */}
       <Card className="settings-card mb-4">
         <div className="reminders-status-row">
           <h3 className="section-title" style={{ margin: 0 }}>
-            Push Reminders
+            Reminders
           </h3>
           <span
             className={`reminders-status-pill status-${
@@ -603,7 +773,7 @@ export const SettingsPage: React.FC = () => {
                 ? 'browser'
                 : pushStatus.permission === 'denied'
                 ? 'blocked'
-                : pushStatus.isSubscribed
+                : remindersEnabled && pushStatus.isSubscribed
                 ? 'on'
                 : 'off'
             }`}
@@ -612,13 +782,13 @@ export const SettingsPage: React.FC = () => {
               ? 'Browser Tab'
               : pushStatus.permission === 'denied'
               ? 'Blocked'
-              : pushStatus.isSubscribed
+              : remindersEnabled && pushStatus.isSubscribed
               ? 'On'
               : 'Off'}
           </span>
         </div>
         <p className="section-desc" style={{ marginBottom: 12 }}>
-          Hourly notifications from 8 AM to 11 PM that open directly to your log screen.
+          Hourly notifications that open directly to your log screen.
         </p>
 
         {!pushStatus.isStandalone ? (
@@ -655,50 +825,147 @@ export const SettingsPage: React.FC = () => {
               <strong>Allow Notifications</strong>, and reload this screen.
             </p>
           </div>
-        ) : pushStatus.isSubscribed ? (
-          /* When reminders are on */
-          <div>
-            <p
-              className="section-desc"
-              style={{ marginBottom: 14, color: '#3b5c34', fontWeight: 500 }}
-            >
-              Reminders are turned on. You will receive an hourly check-in between 8 AM and 11 PM.
-            </p>
-            <Button
-              variant="secondary"
-              onClick={handleToggleReminders}
-              disabled={pushBusy}
-              aria-label="Turn off reminders"
-            >
-              {pushBusy ? 'Updating...' : 'Turn off reminders'}
-            </Button>
-          </div>
         ) : (
-          /* When reminders are off */
+          /* When in standalone mode and not blocked */
           <div>
-            <p className="section-desc" style={{ marginBottom: 14 }}>
-              Tap below to grant notification permission and receive hourly check-ins.
+            {/* On / Off Switch */}
+            <div className="reminders-toggle-container">
+              <label htmlFor="reminders-enabled-switch" className="reminders-toggle-label">
+                <input
+                  id="reminders-enabled-switch"
+                  type="checkbox"
+                  className="reminders-switch-input"
+                  checked={remindersEnabled}
+                  onChange={(e) => handleToggleSwitch(e.target.checked)}
+                  disabled={pushBusy}
+                  aria-label="Toggle hourly reminders"
+                />
+                <span
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontWeight: 600,
+                    fontSize: 17,
+                    color: 'var(--ink)',
+                  }}
+                >
+                  Hourly check-ins
+                </span>
+              </label>
+            </div>
+
+            {/* Next scheduled reminder time under the switch */}
+            <p className="reminders-next-time">
+              {!remindersEnabled ? (
+                'Reminders are currently paused.'
+              ) : isSnoozed ? (
+                <>
+                  Snoozed until <strong>{snoozeTimeFormatted}</strong> · Next reminder:{' '}
+                  <strong>{nextReminderText}</strong>
+                </>
+              ) : (
+                <>
+                  Next reminder: <strong>{nextReminderText || 'Calculating...'}</strong>
+                </>
+              )}
             </p>
-            <Button
-              onClick={handleToggleReminders}
-              disabled={pushBusy}
-              aria-label="Turn on reminders"
-            >
-              {pushBusy ? 'Turning on...' : 'Turn on reminders'}
-            </Button>
+
+            {/* Active snooze banner with cancel option */}
+            {isSnoozed && (
+              <div className="reminders-snooze-banner">
+                <span>Reminders are snoozed for 1 hour</span>
+                <button
+                  type="button"
+                  className="reminders-cancel-snooze-btn"
+                  onClick={handleCancelSnooze}
+                  aria-label="Cancel snooze"
+                >
+                  Resume now
+                </button>
+              </div>
+            )}
+
+            {/* Schedule Range: First and Last Reminder Hours */}
+            <div className="reminders-schedule-group">
+              <div className="reminders-schedule-field">
+                <label className="sheet-label" htmlFor="reminder-start-hour-select">
+                  First reminder
+                </label>
+                <select
+                  id="reminder-start-hour-select"
+                  className="reminders-select"
+                  value={startHour}
+                  onChange={(e) => handleStartHourChange(parseInt(e.target.value, 10))}
+                  aria-label="First reminder hour"
+                >
+                  {Array.from({ length: 24 }, (_, i) => (
+                    <option key={i} value={i}>
+                      {formatHourLabel(i)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="reminders-schedule-field">
+                <label className="sheet-label" htmlFor="reminder-end-hour-select">
+                  Last reminder
+                </label>
+                <select
+                  id="reminder-end-hour-select"
+                  className="reminders-select"
+                  value={endHour}
+                  onChange={(e) => handleEndHourChange(parseInt(e.target.value, 10))}
+                  aria-label="Last reminder hour"
+                >
+                  {Array.from({ length: 24 }, (_, i) => (
+                    <option key={i} value={i}>
+                      {formatHourLabel(i)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Timezone Picker */}
+            <div style={{ marginBottom: 16 }}>
+              <label className="sheet-label" htmlFor="reminder-timezone-select">
+                Timezone
+              </label>
+              <select
+                id="reminder-timezone-select"
+                className="reminders-select"
+                value={userTimezone}
+                onChange={(e) => handleTimezoneChange(e.target.value)}
+                aria-label="Reminder timezone"
+              >
+                {availableTimezones.map((tz) => (
+                  <option key={tz} value={tz}>
+                    {tz}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Actions: Snooze 1 hour & Send test reminder */}
+            <div className="reminders-actions-row">
+              <Button
+                variant="secondary"
+                onClick={handleSnooze}
+                disabled={snoozing || !remindersEnabled}
+                aria-label="Snooze for 1 hour"
+              >
+                {snoozing ? 'Snoozing...' : 'Snooze for 1 hour'}
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={handleSendTestReminder}
+                disabled={sendingTest}
+                aria-label="Send a test reminder"
+              >
+                {sendingTest ? 'Sending...' : 'Send a test reminder'}
+              </Button>
+            </div>
           </div>
         )}
-      </Card>
-
-      {/* Preferences & Default Timezone */}
-      <Card className="settings-card mb-4">
-        <h3 className="section-title">Preferences</h3>
-        <p className="section-desc" style={{ marginBottom: 8 }}>
-          Timezone: <strong>{timeZone}</strong>
-        </p>
-        <p className="section-desc">
-          Schedule settings (quiet hours, snooze) will appear in Milestone 3.4.
-        </p>
       </Card>
 
       <div style={{ marginTop: 24, textAlign: 'center' }}>

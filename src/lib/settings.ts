@@ -197,3 +197,183 @@ export async function getPromptVersionStats(userId: string): Promise<Record<stri
   }
   return stats;
 }
+
+/**
+ * Common timezones for picker
+ */
+export const COMMON_TIMEZONES = [
+  'America/Phoenix',
+  'America/Los_Angeles',
+  'America/Denver',
+  'America/Chicago',
+  'America/New_York',
+  'America/Anchorage',
+  'Pacific/Honolulu',
+  'Europe/London',
+  'Europe/Paris',
+  'Asia/Tokyo',
+  'Australia/Sydney',
+];
+
+/**
+ * Milestone 3.4: Update user settings fields
+ */
+export async function updateUserSettings(
+  userId: string,
+  updates: Partial<Omit<UserSettings, 'user_id'>>
+): Promise<UserSettings> {
+  const { data, error } = await supabase
+    .from('settings')
+    .update(updates)
+    .eq('user_id', userId)
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to update settings: ${error.message}`);
+  }
+  return data as UserSettings;
+}
+
+/**
+ * Milestone 3.4: Snooze reminders for a given number of minutes (default 60 = 1 hour)
+ */
+export async function snoozeReminders(
+  userId: string,
+  durationMinutes: number = 60
+): Promise<string> {
+  const snoozeUntil = new Date(Date.now() + durationMinutes * 60 * 1000).toISOString();
+  await updateUserSettings(userId, { snooze_until: snoozeUntil });
+  return snoozeUntil;
+}
+
+/**
+ * Milestone 3.4: Cancel active snooze
+ */
+export async function cancelSnooze(userId: string): Promise<void> {
+  await updateUserSettings(userId, { snooze_until: null });
+}
+
+/**
+ * Helper to compute local hour (0-23) in a given timezone
+ */
+export function getLocalHour(date: Date, timeZone: string): number {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hour: 'numeric',
+      hour12: false,
+    });
+    const hourStr = formatter.format(date);
+    const hour = parseInt(hourStr, 10);
+    return hour === 24 ? 0 : hour;
+  } catch {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Phoenix',
+      hour: 'numeric',
+      hour12: false,
+    });
+    const hourStr = formatter.format(date);
+    const hour = parseInt(hourStr, 10);
+    return hour === 24 ? 0 : hour;
+  }
+}
+
+/**
+ * Milestone 3.4: Compute the next scheduled reminder time based on settings and snooze
+ */
+export function computeNextReminderTime(
+  settings: Pick<
+    UserSettings,
+    'reminders_enabled' | 'timezone' | 'reminder_start_hour' | 'reminder_end_hour' | 'snooze_until'
+  >,
+  currentTime: Date = new Date()
+): Date | null {
+  if (!settings.reminders_enabled) {
+    return null;
+  }
+
+  const timeZone = settings.timezone || 'America/Phoenix';
+  const startHour =
+    typeof settings.reminder_start_hour === 'number' ? settings.reminder_start_hour : 8;
+  const endHour =
+    typeof settings.reminder_end_hour === 'number' ? settings.reminder_end_hour : 23;
+
+  let earliestAllowed = currentTime.getTime();
+  if (settings.snooze_until) {
+    const snoozeTime = new Date(settings.snooze_until).getTime();
+    if (snoozeTime > earliestAllowed) {
+      earliestAllowed = snoozeTime;
+    }
+  }
+
+  // Next top of the hour after earliestAllowed
+  const candidate = new Date(earliestAllowed);
+  if (
+    candidate.getMinutes() > 0 ||
+    candidate.getSeconds() > 0 ||
+    candidate.getMilliseconds() > 0
+  ) {
+    candidate.setMinutes(0, 0, 0);
+    candidate.setHours(candidate.getHours() + 1);
+  }
+
+  // Search forward for the next hour inside the [startHour, endHour] window
+  let iterations = 0;
+  while (iterations < 72) {
+    const hour = getLocalHour(candidate, timeZone);
+    if (hour >= startHour && hour <= endHour) {
+      return candidate;
+    }
+    candidate.setHours(candidate.getHours() + 1);
+    iterations++;
+  }
+
+  return candidate;
+}
+
+/**
+ * Milestone 3.4: Formats a Date to a friendly string: "Today at 3:00 PM", "Tomorrow at 8:00 AM", etc.
+ */
+export function formatFriendlyTime(
+  date: Date,
+  timeZone: string,
+  relativeTo: Date = new Date()
+): string {
+  const timeFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+
+  const dateFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+  });
+
+  const targetDateStr = dateFormatter.format(date);
+  const todayStr = dateFormatter.format(relativeTo);
+
+  const tomorrow = new Date(relativeTo);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = dateFormatter.format(tomorrow);
+
+  const timeStr = timeFormatter.format(date);
+
+  if (targetDateStr === todayStr) {
+    return `Today at ${timeStr}`;
+  } else if (targetDateStr === tomorrowStr) {
+    return `Tomorrow at ${timeStr}`;
+  } else {
+    const dayFormatter = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    });
+    return `${dayFormatter.format(date)} at ${timeStr}`;
+  }
+}
+
