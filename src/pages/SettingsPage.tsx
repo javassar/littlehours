@@ -25,7 +25,10 @@ import {
 import {
   getPushStatus,
   subscribeToPush,
+  isPushSupported,
+  getNotificationPermission,
   PushStatus,
+  PushPermission,
 } from '../lib/push';
 
 export const SettingsPage: React.FC = () => {
@@ -306,34 +309,84 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleSendTestReminder = async () => {
+  const handleSendTestNotification = async () => {
     if (!user) return;
-    if (!pushStatus.isSubscribed) {
-      showToast('Turn on reminders first to register your device');
+
+    if (!isPushSupported()) {
+      showToast('Notifications are not supported in this browser');
       return;
     }
 
     setSendingTest(true);
     try {
-      const { data, error } = await supabase.functions.invoke('send-reminders', {
-        body: {
-          user_id: user.id,
-          ignore_quiet_hours: true,
-          ignore_recent_log: true,
-        },
-      });
-
-      if (error) {
-        throw new Error(error.message);
+      // 1. Request notification permission if not yet granted
+      let perm = getNotificationPermission();
+      if (perm === 'default') {
+        const requested = await Notification.requestPermission();
+        perm = requested as PushPermission;
       }
 
-      if (data && data.notifications_sent > 0) {
-        showToast('Test reminder sent! Check your notification tray');
+      if (perm === 'denied') {
+        showToast('Notifications are blocked in your browser or device settings');
+        await loadPushStatus();
+        return;
+      }
+
+      // 2. Ensure device is registered and subscribed to push
+      let isSubscribed = pushStatus.isSubscribed;
+      if (!isSubscribed) {
+        const subRes = await subscribeToPush(user.id);
+        if (subRes.success) {
+          isSubscribed = true;
+          setRemindersEnabled(true);
+          await updateUserSettings(user.id, { reminders_enabled: true });
+        }
+      }
+      await loadPushStatus();
+      if (refreshSettings) await refreshSettings();
+
+      // 3. Immediately display a test notification through the service worker
+      let shownLocally = false;
+      if ('serviceWorker' in navigator) {
+        try {
+          const reg = await navigator.serviceWorker.ready;
+          await reg.showNotification('Little Hours', {
+            body: 'Tell me how you spent the past hour.',
+            icon: '/icon-192.png',
+            badge: '/icon-192.png',
+            tag: 'hourly',
+            data: { url: '/?focus=1' },
+          });
+          shownLocally = true;
+        } catch (swErr) {
+          console.warn('Local service worker notification failed:', swErr);
+        }
+      }
+
+      // 4. Also call the backend Edge Function send-reminders to test the full push pipeline
+      let serverSent = false;
+      try {
+        const { data, error } = await supabase.functions.invoke('send-reminders', {
+          body: {
+            user_id: user.id,
+            ignore_quiet_hours: true,
+            ignore_recent_log: true,
+          },
+        });
+        if (!error && data && data.notifications_sent > 0) {
+          serverSent = true;
+        }
+      } catch (backendErr) {
+        console.warn('Backend send-reminders invoke failed:', backendErr);
+      }
+
+      if (shownLocally || serverSent) {
+        showToast('Test notification sent! Check your notification tray');
       } else {
-        showToast('Test reminder processed');
+        showToast('Test notification processed');
       }
     } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : 'Failed to send test reminder');
+      showToast(err instanceof Error ? err.message : 'Failed to send test notification');
     } finally {
       setSendingTest(false);
     }
@@ -845,6 +898,16 @@ export const SettingsPage: React.FC = () => {
               Once opened from your Home Screen, the &ldquo;Turn on reminders&rdquo; button will
               appear here.
             </p>
+            <div style={{ marginTop: 14 }}>
+              <Button
+                variant="secondary"
+                onClick={handleSendTestNotification}
+                disabled={sendingTest}
+                aria-label="Send a test notification"
+              >
+                {sendingTest ? 'Sending...' : 'Send a test notification'}
+              </Button>
+            </div>
           </div>
         ) : pushStatus.permission === 'denied' ? (
           /* When notifications are blocked in system settings */
@@ -855,6 +918,16 @@ export const SettingsPage: React.FC = () => {
               <strong>Settings &gt; Safari (or Little Hours) &gt; Notifications</strong>, turn on{' '}
               <strong>Allow Notifications</strong>, and reload this screen.
             </p>
+            <div style={{ marginTop: 12 }}>
+              <Button
+                variant="secondary"
+                onClick={handleSendTestNotification}
+                disabled={sendingTest}
+                aria-label="Send a test notification"
+              >
+                {sendingTest ? 'Checking...' : 'Send a test notification'}
+              </Button>
+            </div>
           </div>
         ) : (
           /* When in standalone mode and not blocked */
@@ -976,7 +1049,7 @@ export const SettingsPage: React.FC = () => {
               </select>
             </div>
 
-            {/* Actions: Snooze 1 hour & Send test reminder */}
+            {/* Actions: Snooze 1 hour & Send test notification */}
             <div className="reminders-actions-row">
               <Button
                 variant="secondary"
@@ -988,11 +1061,11 @@ export const SettingsPage: React.FC = () => {
               </Button>
               <Button
                 variant="secondary"
-                onClick={handleSendTestReminder}
+                onClick={handleSendTestNotification}
                 disabled={sendingTest}
-                aria-label="Send a test reminder"
+                aria-label="Send a test notification"
               >
-                {sendingTest ? 'Sending...' : 'Send a test reminder'}
+                {sendingTest ? 'Sending...' : 'Send a test notification'}
               </Button>
             </div>
           </div>
