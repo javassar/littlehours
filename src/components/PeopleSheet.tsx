@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { TrashIcon } from './EntryEditSheet';
+import { ModalPortal } from './ModalPortal';
 import {
   getPeopleStats,
   renamePerson,
@@ -108,13 +109,14 @@ export const PeopleSheet: React.FC<PeopleSheetProps> = ({
   };
 
   return (
-    <div
-      className="people-sheet-backdrop"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Manage People"
-    >
+    <ModalPortal>
+      <div
+        className="people-sheet-backdrop"
+        onClick={onClose}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Manage People"
+      >
       <div className="people-sheet-surface" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="people-sheet-header">
@@ -285,5 +287,6 @@ export const PeopleSheet: React.FC<PeopleSheetProps> = ({
         </div>
       </div>
     </div>
-  );
+  </ModalPortal>
+);
 };

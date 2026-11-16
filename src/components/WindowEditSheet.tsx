@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from './Button';
+import { ModalPortal } from './ModalPortal';
 import { toDateTimeLocalValue, fromDateTimeLocalValue, formatDuration, formatTime } from '../lib/time';
 import './WindowEditSheet.css';
 
@@ -119,7 +120,8 @@ export const WindowEditSheet: React.FC<WindowEditSheetProps> = ({
     : null;
 
   return (
-    <div className="sheet-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+    <ModalPortal>
+      <div className="sheet-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="sheet-title">
       <div className="sheet-surface" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-handle" aria-hidden="true" />
         
@@ -259,5 +261,6 @@ export const WindowEditSheet: React.FC<WindowEditSheetProps> = ({
         )}
       </div>
     </div>
-  );
+  </ModalPortal>
+);
 };

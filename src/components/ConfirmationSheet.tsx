@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from './Button';
 import { Chip } from './Chip';
 import { Sparkle } from './illustrations/Sparkle';
+import { ModalPortal } from './ModalPortal';
 import { SegmentItem } from './EntryEditSheet';
 import {
   formatDuration,
@@ -308,13 +309,14 @@ export const ConfirmationSheet: React.FC<ConfirmationSheetProps> = ({
   };
 
   return (
-    <div
-      className="confirmation-sheet-backdrop"
-      onClick={handleDismissUnconfirmed}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Confirm time segments"
-    >
+    <ModalPortal>
+      <div
+        className="confirmation-sheet-backdrop"
+        onClick={handleDismissUnconfirmed}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Confirm time segments"
+      >
       <div
         className="confirmation-sheet-surface"
         onClick={(e) => e.stopPropagation()}
@@ -590,5 +592,6 @@ export const ConfirmationSheet: React.FC<ConfirmationSheetProps> = ({
         </div>
       </div>
     </div>
-  );
+  </ModalPortal>
+);
 };

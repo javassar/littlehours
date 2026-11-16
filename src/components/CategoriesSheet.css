@@ -8,19 +8,20 @@
   display: flex;
   align-items: flex-end;
   justify-content: center;
+  padding: 12px 12px calc(72px + env(safe-area-inset-bottom, 0px)) 12px;
+  box-sizing: border-box;
 }
 
 .categories-sheet-surface {
   background-color: var(--surface);
-  border-top-left-radius: 24px;
-  border-top-right-radius: 24px;
+  border-radius: 24px;
   width: 100%;
   max-width: 520px;
-  max-height: 88vh;
+  max-height: calc(100dvh - 88px - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px));
   display: flex;
   flex-direction: column;
-  box-shadow: 0 -8px 32px rgba(75, 51, 64, 0.2);
-  border-top: 1px solid rgba(184, 114, 127, 0.3);
+  box-shadow: 0 4px 30px rgba(75, 51, 64, 0.2);
+  border: 1px solid rgba(184, 114, 127, 0.3);
   box-sizing: border-box;
   animation: categoriesSlideUp 260ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }

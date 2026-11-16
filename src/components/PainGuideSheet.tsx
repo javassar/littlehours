@@ -1,5 +1,6 @@
 import React from 'react';
 import { PAIN_SCALE } from '../lib/painScale';
+import { ModalPortal } from './ModalPortal';
 import './PainGuideSheet.css';
 
 export interface PainGuideSheetProps {
@@ -11,13 +12,14 @@ export const PainGuideSheet: React.FC<PainGuideSheetProps> = ({ isOpen, onClose 
   if (!isOpen) return null;
 
   return (
-    <div
-      className="pain-guide-backdrop"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Average pain over the past hour guide"
-    >
+    <ModalPortal>
+      <div
+        className="pain-guide-backdrop"
+        onClick={onClose}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Average pain over the past hour guide"
+      >
       <div className="pain-guide-surface" onClick={(e) => e.stopPropagation()}>
         <div className="pain-guide-header">
           <div className="pain-guide-handle" aria-hidden="true" />
@@ -62,5 +64,6 @@ export const PainGuideSheet: React.FC<PainGuideSheetProps> = ({ isOpen, onClose 
         </div>
       </div>
     </div>
-  );
+  </ModalPortal>
+);
 };

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from './Button';
 import { PainRating } from './PainRating';
 import { TrashIcon } from './EntryEditSheet';
+import { ModalPortal } from './ModalPortal';
 import {
   toDateTimeLocalValue,
   fromDateTimeLocalValue,
@@ -114,13 +115,14 @@ export const RatingEditSheet: React.FC<RatingEditSheetProps> = ({
       : null;
 
   return (
-    <div
-      className="sheet-backdrop"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="rating-edit-title"
-    >
+    <ModalPortal>
+      <div
+        className="sheet-backdrop"
+        onClick={onClose}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="rating-edit-title"
+      >
       <div className="sheet-surface rating-edit-surface" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-handle" aria-hidden="true" />
 
@@ -250,5 +252,6 @@ export const RatingEditSheet: React.FC<RatingEditSheetProps> = ({
         )}
       </div>
     </div>
-  );
+  </ModalPortal>
+);
 };

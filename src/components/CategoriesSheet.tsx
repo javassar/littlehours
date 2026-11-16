@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Chip } from './Chip';
 import { TrashIcon } from './EntryEditSheet';
+import { ModalPortal } from './ModalPortal';
 import {
   CategoryItem,
   normalizeCategories,
@@ -204,13 +205,14 @@ export const CategoriesSheet: React.FC<CategoriesSheetProps> = ({
   };
 
   return (
-    <div
-      className="categories-sheet-backdrop"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Manage Categories"
-    >
+    <ModalPortal>
+      <div
+        className="categories-sheet-backdrop"
+        onClick={onClose}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Manage Categories"
+      >
       <div className="categories-sheet-surface" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="categories-sheet-header">
@@ -453,5 +455,6 @@ export const CategoriesSheet: React.FC<CategoriesSheetProps> = ({
         </div>
       </div>
     </div>
-  );
+  </ModalPortal>
+);
 };

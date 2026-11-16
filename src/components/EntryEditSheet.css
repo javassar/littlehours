@@ -1,8 +1,8 @@
 .entry-edit-surface {
-  max-height: 85vh;
+  max-height: calc(100dvh - 88px - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px));
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 16px 20px calc(36px + env(safe-area-inset-bottom, 0px)) 20px;
+  padding: 16px 20px 20px 20px;
 }
 
 .entry-sheet-header-row {

@@ -15,6 +15,7 @@ import {
   Chip,
   RatingEditSheet,
   RatingItem,
+  ModalPortal,
 } from '../components';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
@@ -776,7 +777,8 @@ export const HistoryPage: React.FC = () => {
   });
 
   return (
-    <div className="page-container screen-fade-in history-page">
+    <>
+      <div className="page-container screen-fade-in history-page">
       <Toast visible={toastVisible} message={toastMessage} onClose={() => setToastVisible(false)} />
 
       {/* 1. Queued offline entries and ratings shown at the very top with "Waiting to sync" badge */}
@@ -1177,47 +1179,50 @@ export const HistoryPage: React.FC = () => {
           </Button>
         </div>
       )}
+      </div>
 
       {/* Direct Card Delete Confirmation Dialog */}
       {entryToDelete && (
-        <div
-          className="sheet-backdrop"
-          onClick={() => setEntryToDelete(null)}
-          role="dialog"
-          aria-modal="true"
-        >
+        <ModalPortal>
           <div
-            className="sheet-surface"
-            onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: 360, textAlign: 'center', borderRadius: 24, padding: '24px 20px' }}
+            className="sheet-backdrop"
+            onClick={() => setEntryToDelete(null)}
+            role="dialog"
+            aria-modal="true"
           >
-            <div className="entry-delete-confirm-box" style={{ margin: 0 }}>
-              <p className="entry-delete-confirm-text">Delete this entry?</p>
-              <p className="entry-delete-confirm-sub">This action cannot be undone.</p>
-              <div className="sheet-button-row">
-                <Button
-                  variant="secondary"
-                  disabled={isDeletingDirect}
-                  onClick={() => setEntryToDelete(null)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="destructive"
-                  disabled={isDeletingDirect}
-                  onClick={async () => {
-                    setIsDeletingDirect(true);
-                    await handleDeleteEntry(entryToDelete.id);
-                    setIsDeletingDirect(false);
-                    setEntryToDelete(null);
-                  }}
-                >
-                  {isDeletingDirect ? 'Deleting...' : 'Delete'}
-                </Button>
+            <div
+              className="sheet-surface"
+              onClick={(e) => e.stopPropagation()}
+              style={{ width: '100%', maxWidth: 360, textAlign: 'center', borderRadius: 24, padding: '24px 20px' }}
+            >
+              <div className="entry-delete-confirm-box" style={{ margin: 0 }}>
+                <p className="entry-delete-confirm-text">Delete this entry?</p>
+                <p className="entry-delete-confirm-sub">This action cannot be undone.</p>
+                <div className="sheet-button-row">
+                  <Button
+                    variant="secondary"
+                    disabled={isDeletingDirect}
+                    onClick={() => setEntryToDelete(null)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    disabled={isDeletingDirect}
+                    onClick={async () => {
+                      setIsDeletingDirect(true);
+                      await handleDeleteEntry(entryToDelete.id);
+                      setIsDeletingDirect(false);
+                      setEntryToDelete(null);
+                    }}
+                  >
+                    {isDeletingDirect ? 'Deleting...' : 'Delete'}
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
       {/* Confirmation sheet for segments (Milestone 2.3) */}
@@ -1292,6 +1297,6 @@ export const HistoryPage: React.FC = () => {
         onDelete={handleDeleteRating}
         timeZone={timeZone}
       />
-    </div>
+    </>
   );
 };

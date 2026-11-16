@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from './Button';
 import { PainRating } from './PainRating';
+import { ModalPortal } from './ModalPortal';
 import { toDateTimeLocalValue, fromDateTimeLocalValue, formatDuration } from '../lib/time';
 import './EntryEditSheet.css';
 
@@ -204,13 +205,14 @@ export const EntryEditSheet: React.FC<EntryEditSheetProps> = ({
   };
 
   return (
-    <div
-      className="sheet-backdrop"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="entry-edit-title"
-    >
+    <ModalPortal>
+      <div
+        className="sheet-backdrop"
+        onClick={onClose}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="entry-edit-title"
+      >
       <div className="sheet-surface entry-edit-surface" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-handle" aria-hidden="true" />
 
@@ -464,5 +466,6 @@ export const EntryEditSheet: React.FC<EntryEditSheetProps> = ({
         )}
       </div>
     </div>
-  );
+  </ModalPortal>
+);
 };
