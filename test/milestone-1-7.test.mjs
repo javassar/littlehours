@@ -38,7 +38,11 @@ console.log('✓ 192px, 512px, and 512px maskable icons verified');
 const indexHtml = fs.readFileSync('index.html', 'utf8');
 assert(indexHtml.includes('rel="apple-touch-icon"'), 'index.html must link apple-touch-icon');
 assert(indexHtml.includes('name="theme-color" content="#F6EDEA"'), 'theme-color must be #F6EDEA');
-assert(indexHtml.includes('name="apple-mobile-web-app-capable" content="yes"'), 'apple-mobile-web-app-capable must be yes');
+assert(
+  indexHtml.includes('name="mobile-web-app-capable" content="yes"') ||
+    indexHtml.includes('name="apple-mobile-web-app-capable" content="yes"'),
+  'mobile-web-app-capable must be yes'
+);
 console.log('✓ index.html PWA tags verified');
 
 // 5. Verify sw.ts

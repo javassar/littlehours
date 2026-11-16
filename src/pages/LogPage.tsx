@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Card,
   Button,
@@ -77,6 +78,32 @@ export const LogPage: React.FC = () => {
   const [isConfirmationOpen, setIsConfirmationOpen] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Milestone 3.2: Focus textarea when opened with /?focus=1 from push notification
+  useEffect(() => {
+    if (searchParams.get('focus') === '1') {
+      textareaRef.current?.focus();
+      searchParams.delete('focus');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
+  // Milestone 3.2: Focus textarea when service worker notifies of window focus
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'NOTIFICATION_CLICK_FOCUS') {
+        textareaRef.current?.focus();
+      }
+    };
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', handleMessage);
+      return () => {
+        navigator.serviceWorker.removeEventListener('message', handleMessage);
+      };
+    }
+  }, []);
 
   // Auto-resize textarea to fit content
   const adjustTextareaHeight = () => {
