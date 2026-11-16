@@ -59,6 +59,34 @@ Deno.serve(async (req: Request) => {
     }
 
     // 2. Load settings & categories
+    const DEFAULT_CATEGORIES: Array<{ name: string; description: string }> = [
+      { name: 'work', description: 'Paid or assigned work, including freelance work and work for family.' },
+      { name: 'job search', description: 'Applications, resumes, cover letters, job boards, and interview prep.' },
+      { name: 'networking', description: 'Conversations or messages with career contacts, including informational chats and follow-ups.' },
+      { name: 'professional development', description: 'Learning and building skills for my field: courses, tutorials, reading about my field, and portfolio or skill-building projects.' },
+      { name: 'admin', description: 'Paperwork, money, accounts, scheduling, and inbox upkeep: bills, taxes, forms, passwords, booking and rescheduling. Paperwork that serves one other category belongs to that category (an insurance claim is healthcare, application forms are job search). Never use for tasks that are not paperwork or logistics.' },
+      { name: 'doomscrolling', description: 'Scrolling any app or site mindlessly or compulsively. Only when the text signals it.' },
+      { name: 'social media', description: 'Chosen use of apps like Pinterest and BeReal, including browsing, posting, and commenting.' },
+      { name: 'entertainment', description: 'Chosen content or routine viewing, alone or with others: TV, movies, YouTube videos, podcasts, music, and games. Not a ticketed or invited occasion.' },
+      { name: 'events', description: 'Ticketed, invited, or formally scheduled occasions: ballet, concerts, theater, weddings, parties, games. Outranks entertainment, social time, and social meals.' },
+      { name: 'texting', description: 'Messaging with friends and family. Career messages go to networking or job search.' },
+      { name: 'social time', description: 'Time where interacting with people is the activity: visits, talking, calls and video calls, hanging out.' },
+      { name: 'sleep', description: 'Sleeping, and lying in bed trying to fall asleep.' },
+      { name: 'exercise', description: 'Workouts, walks for fitness, sports, and stretching.' },
+      { name: 'functional meals', description: 'Preparing and eating ordinary meals, alone or with the people I live with. Dishes and cleanup are chores.' },
+      { name: 'social meals', description: 'Meals out or hosted where the meal is also the social occasion. Formally invited meals are events.' },
+      { name: 'chores', description: 'Housework inside the home: cleaning, laundry, dishes, tidying.' },
+      { name: 'errands', description: 'Necessary tasks outside the home: groceries, bank, post office, returns.' },
+      { name: 'shopping', description: 'Browsing or buying things I want, in store or online.' },
+      { name: 'reading', description: 'Reading books or long-form pieces for pleasure. Reading about my field is professional development.' },
+      { name: 'piano', description: 'Playing, practicing, or learning piano.' },
+      { name: 'hobbies', description: 'Hobbies without their own category: crafts, baking for fun, writing, journaling. Specifics go in the label.' },
+      { name: 'hygiene', description: 'Daily basics: showering, brushing teeth, getting dressed, skincare routine.' },
+      { name: 'personal care', description: 'Occasional or discretionary care: hair, nails, spa, massage, self-care sessions.' },
+      { name: 'healthcare', description: 'Appointments, medication, therapy, and related pharmacy trips.' },
+      { name: 'vacation', description: 'Everything while on a trip, from leaving home until returning. Overrides all other categories.' },
+    ];
+
     const { data: settings } = await supabase
       .from('settings')
       .select('timezone, categories')
@@ -66,32 +94,35 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     const timeZone = settings?.timezone || 'America/Phoenix';
-    const categories: string[] = Array.isArray(settings?.categories)
-      ? settings.categories
-      : [
-          'work',
-          'job search',
-          'phone and social media',
-          'sleep',
-          'exercise',
-          'meals',
-          'chores',
-          'social time',
-          'reading',
-          'entertainment',
-          'travel',
-          'personal care',
-          'errands',
-          'rest',
-        ];
+    const rawCategories = Array.isArray(settings?.categories) ? settings.categories : [];
+    const categories: Array<{ name: string; description: string }> =
+      rawCategories.length > 0
+        ? rawCategories.map((c: any) => {
+            if (typeof c === 'string') {
+              const clean = c.trim().toLowerCase();
+              const aliased = clean === 'digital media time' ? 'social media' : clean === 'misc hobby' ? 'hobbies' : clean;
+              const found = DEFAULT_CATEGORIES.find((d) => d.name === aliased);
+              return { name: aliased, description: found?.description || '' };
+            }
+            const name = String(c.name || '').trim().toLowerCase();
+            const aliased = name === 'digital media time' ? 'social media' : name === 'misc hobby' ? 'hobbies' : name;
+            const found = DEFAULT_CATEGORIES.find((d) => d.name === aliased);
+            return {
+              name: aliased,
+              description: String(c.description || found?.description || ''),
+            };
+          })
+        : DEFAULT_CATEGORIES;
 
-    // 3. Load labels used so far: distinct activity_label and category pairs, most frequent first, capped at 100
+    // 3. Load labels used so far and company names used so far: capped at 100
     const { data: segs } = await supabase
       .from('segments')
-      .select('activity_label, category')
+      .select('activity_label, category, company')
       .eq('user_id', entry.user_id);
 
     const freqMap = new Map<string, { activity_label: string; category: string; count: number }>();
+    const companyFreq = new Map<string, { name: string; count: number }>();
+
     for (const s of segs || []) {
       const key = `${s.activity_label.trim().toLowerCase()}::${s.category.trim().toLowerCase()}`;
       const existing = freqMap.get(key);
@@ -104,12 +135,30 @@ Deno.serve(async (req: Request) => {
           count: 1,
         });
       }
+
+      const rawComp: string[] = Array.isArray(s.company) ? s.company : [];
+      for (const n of rawComp) {
+        const trimmed = typeof n === 'string' ? n.trim() : '';
+        if (!trimmed) continue;
+        const lower = trimmed.toLowerCase();
+        const existingC = companyFreq.get(lower);
+        if (existingC) {
+          existingC.count += 1;
+        } else {
+          companyFreq.set(lower, { name: trimmed, count: 1 });
+        }
+      }
     }
 
     const labelsUsed = Array.from(freqMap.values())
       .sort((a, b) => b.count - a.count)
       .slice(0, 100)
       .map(({ activity_label, category }) => ({ activity_label, category }));
+
+    const companyUsed = Array.from(companyFreq.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 100)
+      .map((item) => item.name);
 
     // 4. Gemini API Configuration
     const rawApiKey = Deno.env.get('GEMINI_API_KEY');
@@ -211,14 +260,18 @@ Deno.serve(async (req: Request) => {
       answer: f.answer,
     }));
 
+    const onVacation = Boolean(entry.on_vacation);
+
     const initialUserPayload = {
       raw_text: entry.raw_text,
+      follow_ups: followUpsFormatted,
       window_start: entry.window_start,
       window_end: entry.window_end,
       timezone: timeZone,
-      category_list: categories,
+      on_vacation: onVacation,
+      categories: categories,
       labels_used: labelsUsed,
-      follow_ups: followUpsFormatted,
+      company_used: companyUsed,
     };
 
     let usedModel = candidateModels[0];
@@ -249,6 +302,7 @@ Deno.serve(async (req: Request) => {
                 },
                 segments: {
                   type: 'ARRAY',
+                  nullable: true,
                   items: {
                     type: 'OBJECT',
                     properties: {
@@ -266,14 +320,19 @@ Deno.serve(async (req: Request) => {
                       },
                       category: {
                         type: 'STRING',
-                        description: 'One of the allowed categories',
+                        description: 'One name from categories',
+                      },
+                      company: {
+                        type: 'ARRAY',
+                        items: { type: 'STRING' },
+                        description: 'People the user was with during this segment',
                       },
                     },
-                    required: ['start_time', 'end_time', 'activity_label', 'category'],
+                    required: ['start_time', 'end_time', 'activity_label', 'category', 'company'],
                   },
                 },
               },
-              required: ['status', 'segments'],
+              required: ['status'],
             },
           },
         };
@@ -330,6 +389,7 @@ Deno.serve(async (req: Request) => {
 
     let parseResult: ParseResponse | null = null;
     let finalValidationError: string | null = null;
+    let finalSanitizedSegments: any[] | undefined = undefined;
 
     if (simulateBroken) {
       finalValidationError = 'Simulated broken model reply';
@@ -337,10 +397,14 @@ Deno.serve(async (req: Request) => {
       try {
         // Attempt 1
         const attempt1 = await callGemini(contents);
-        const val1 = validateParseResult(attempt1.parsed, entry.window_start, entry.window_end, categories);
+        const val1 = validateParseResult(attempt1.parsed, entry.window_start, entry.window_end, categories, {
+          onVacation,
+          companyUsed,
+        });
 
         if (val1.valid) {
           parseResult = attempt1.parsed;
+          finalSanitizedSegments = val1.sanitizedSegments;
         } else {
           // Retry once with validation error added
           contents.push({
@@ -357,10 +421,14 @@ Deno.serve(async (req: Request) => {
           });
 
           const attempt2 = await callGemini(contents);
-          const val2 = validateParseResult(attempt2.parsed, entry.window_start, entry.window_end, categories);
+          const val2 = validateParseResult(attempt2.parsed, entry.window_start, entry.window_end, categories, {
+            onVacation,
+            companyUsed,
+          });
 
           if (val2.valid) {
             parseResult = attempt2.parsed;
+            finalSanitizedSegments = val2.sanitizedSegments;
           } else {
             finalValidationError = val2.error || 'Second validation attempt failed.';
           }
@@ -419,13 +487,15 @@ Deno.serve(async (req: Request) => {
     }
 
     // Status is 'parsed': Replace any existing segments and insert new segments
-    const newSegments = (parseResult.segments || []).map((seg) => ({
+    const segmentsToUse = finalSanitizedSegments || parseResult.segments || [];
+    const newSegments = segmentsToUse.map((seg) => ({
       entry_id: entry.id,
       user_id: entry.user_id,
       start_time: seg.start_time,
       end_time: seg.end_time,
       activity_label: seg.activity_label.trim().toLowerCase(),
       category: seg.category.trim().toLowerCase(),
+      company: Array.isArray(seg.company) ? seg.company : [],
       confirmed: false,
       model: usedModel,
       prompt_version: PROMPT_VERSION,

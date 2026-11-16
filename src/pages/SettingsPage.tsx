@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Button, Hummingbird, Chip, Toast, CategoriesSheet } from '../components';
+import { Card, Button, Hummingbird, Chip, Toast, CategoriesSheet, PeopleSheet } from '../components';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import {
@@ -13,15 +13,18 @@ import {
 } from '../lib/export';
 import { getQueue } from '../lib/offlineQueue';
 import {
-  STARTER_CATEGORIES,
+  CategoryItem,
+  normalizeCategories,
   getPromptVersionStats,
   COMMON_TIMEZONES,
   updateUserSettings,
+  setVacationMode,
   snoozeReminders,
   cancelSnooze,
   computeNextReminderTime,
   formatFriendlyTime,
 } from '../lib/settings';
+import { formatDurationMs } from '../lib/time';
 import {
   getPushStatus,
   subscribeToPush,
@@ -38,17 +41,46 @@ export const SettingsPage: React.FC = () => {
 
   // Categories management
   const [categoriesSheetOpen, setCategoriesSheetOpen] = useState(false);
-  const [categories, setCategories] = useState<string[]>(
-    settings?.categories && settings.categories.length > 0
-      ? settings.categories
-      : STARTER_CATEGORIES
+  const [categories, setCategories] = useState<CategoryItem[]>(
+    normalizeCategories(settings?.categories)
   );
 
   useEffect(() => {
-    if (settings?.categories && settings.categories.length > 0) {
-      setCategories(settings.categories);
+    if (settings?.categories) {
+      setCategories(normalizeCategories(settings.categories));
     }
   }, [settings?.categories]);
+
+  // People management (Milestone 3.7)
+  const [peopleSheetOpen, setPeopleSheetOpen] = useState(false);
+
+  // Vacation mode state & toggle (Milestone 3.7)
+  const [vacationMode, setVacationModeState] = useState<boolean>(Boolean(settings?.vacation_mode));
+  const [vacationBusy, setVacationBusy] = useState(false);
+
+  useEffect(() => {
+    if (settings?.vacation_mode !== undefined) {
+      setVacationModeState(Boolean(settings.vacation_mode));
+    }
+  }, [settings?.vacation_mode]);
+
+  const handleToggleVacationMode = async (checked: boolean) => {
+    if (!user) return;
+    setVacationModeState(checked);
+    setVacationBusy(true);
+    try {
+      await setVacationMode(user.id, checked);
+      if (refreshSettings) await refreshSettings();
+      showToast(checked ? 'Vacation mode turned on' : 'Vacation mode turned off');
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : 'Failed to update vacation mode');
+    } finally {
+      setVacationBusy(false);
+    }
+  };
+
+  // Vacation hours calculation (Milestone 3.7)
+  const [vacationDurationMs, setVacationDurationMs] = useState<number>(0);
 
   // Prompt version stats
   const [promptStats, setPromptStats] = useState<Record<string, number>>({});
@@ -83,6 +115,52 @@ export const SettingsPage: React.FC = () => {
   const [toDate, setToDate] = useState('');
   const [exporting, setExporting] = useState<'csv' | 'json' | null>(null);
   const [exportStatus, setExportStatus] = useState<string | null>(null);
+
+  // Compute vacation hours for selected date range (Milestone 3.7)
+  useEffect(() => {
+    if (!user) return;
+    let isMounted = true;
+
+    (async () => {
+      try {
+        let query = supabase
+          .from('segments')
+          .select('start_time, end_time, category')
+          .eq('user_id', user.id)
+          .eq('category', 'vacation');
+
+        if (fromDate) {
+          const startOfDay = new Date(`${fromDate}T00:00:00`);
+          query = query.gte('start_time', startOfDay.toISOString());
+        }
+        if (toDate) {
+          const endOfDay = new Date(`${toDate}T23:59:59.999`);
+          query = query.lte('end_time', endOfDay.toISOString());
+        }
+
+        const { data, error } = await query;
+        if (error || !data) return;
+
+        let totalMs = 0;
+        for (const seg of data) {
+          const s = new Date(seg.start_time).getTime();
+          const e = new Date(seg.end_time).getTime();
+          if (e > s) {
+            totalMs += e - s;
+          }
+        }
+        if (isMounted) {
+          setVacationDurationMs(totalMs);
+        }
+      } catch (err) {
+        console.warn('Error calculating vacation hours:', err);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id, fromDate, toDate]);
 
   // Push reminders state (Milestone 3.1)
   const [pushStatus, setPushStatus] = useState<PushStatus>({
@@ -208,7 +286,7 @@ export const SettingsPage: React.FC = () => {
     navigate('/login', { replace: true });
   };
 
-  const handleCategoriesUpdated = (newCats: string[]) => {
+  const handleCategoriesUpdated = (newCats: CategoryItem[]) => {
     setCategories(newCats);
     if (refreshSettings) {
       refreshSettings();
@@ -514,7 +592,7 @@ export const SettingsPage: React.FC = () => {
     let query = supabase
       .from('entries')
       .select(
-        'id, window_start, window_end, raw_text, created_at, follow_ups, segments(id, start_time, end_time, activity_label, category, confirmed)'
+        'id, window_start, window_end, raw_text, created_at, on_vacation, follow_ups, segments(id, start_time, end_time, activity_label, category, company, confirmed)'
       )
       .eq('user_id', user.id)
       .order('window_start', { ascending: true });
@@ -566,6 +644,7 @@ export const SettingsPage: React.FC = () => {
               window_end: qEntry.window_end,
               raw_text: qEntry.raw_text,
               created_at: qEntry.created_at || qEntry.queued_at,
+              on_vacation: Boolean(qEntry.on_vacation),
               segments: [],
             });
           }
@@ -646,6 +725,37 @@ export const SettingsPage: React.FC = () => {
         </Button>
       </Card>
 
+      {/* Vacation Mode (Milestone 3.7) */}
+      <Card className="settings-card mb-4">
+        <div className="reminders-status-row">
+          <h3 className="section-title" style={{ margin: 0 }}>
+            Vacation Mode
+          </h3>
+          <span className={`reminders-status-pill status-${vacationMode ? 'on' : 'off'}`}>
+            {vacationMode ? 'On' : 'Off'}
+          </span>
+        </div>
+        <p className="section-desc" style={{ marginBottom: 12 }}>
+          While on, new entries are automatically categorized as vacation time.
+        </p>
+        <div className="reminders-toggle-container">
+          <label htmlFor="settings-vacation-switch" className="reminders-toggle-label">
+            <input
+              id="settings-vacation-switch"
+              type="checkbox"
+              className="reminders-switch-input"
+              checked={vacationMode}
+              onChange={(e) => handleToggleVacationMode(e.target.checked)}
+              disabled={vacationBusy}
+              aria-label="Toggle vacation mode"
+            />
+            <span style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 16 }}>
+              On vacation
+            </span>
+          </label>
+        </div>
+      </Card>
+
       {/* Categories Management (Milestone 2.6) */}
       <Card className="settings-card mb-4">
         <div className="settings-section-header">
@@ -665,7 +775,7 @@ export const SettingsPage: React.FC = () => {
         </p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
           {categories.map((cat) => (
-            <Chip key={cat} label={cat} size="sm" />
+            <Chip key={cat.name} label={cat.name} size="sm" />
           ))}
         </div>
       </Card>
@@ -678,6 +788,36 @@ export const SettingsPage: React.FC = () => {
           categories={categories}
           onClose={() => setCategoriesSheetOpen(false)}
           onCategoriesUpdated={handleCategoriesUpdated}
+          onToast={showToast}
+        />
+      )}
+
+      {/* People Management (Milestone 3.7) */}
+      <Card className="settings-card mb-4">
+        <div className="settings-section-header">
+          <h3 className="section-title" style={{ margin: 0 }}>
+            People
+          </h3>
+          <Button
+            variant="secondary"
+            onClick={() => setPeopleSheetOpen(true)}
+            aria-label="Manage people"
+          >
+            Manage people
+          </Button>
+        </div>
+        <p className="section-desc" style={{ marginBottom: 12 }}>
+          View and manage the people you log time with, rename or merge duplicate spellings, and see
+          total hours.
+        </p>
+      </Card>
+
+      {/* People Sheet Dialog */}
+      {user && (
+        <PeopleSheet
+          isOpen={peopleSheetOpen}
+          userId={user.id}
+          onClose={() => setPeopleSheetOpen(false)}
           onToast={showToast}
         />
       )}
@@ -772,10 +912,30 @@ export const SettingsPage: React.FC = () => {
       {/* Export Section (Milestone 1.6 & 2.6) */}
       <Card className="settings-card mb-4">
         <h3 className="section-title">Export Entries</h3>
-        <p className="section-desc" style={{ marginBottom: 16 }}>
+        <p className="section-desc" style={{ marginBottom: 14 }}>
           Download your complete history as CSV or JSON with segment details and follow-ups. Each
           row represents one segment, matching History.
         </p>
+
+        {/* Vacation hours line (Milestone 3.7) */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '10px 14px',
+            backgroundColor: 'rgba(201, 187, 214, 0.25)',
+            border: '1px solid rgba(142, 107, 122, 0.25)',
+            borderRadius: '14px',
+            marginBottom: '16px',
+            fontFamily: 'var(--font-body)',
+            fontSize: '13.5px',
+            color: 'var(--ink)',
+          }}
+        >
+          <span>Vacation hours:</span>
+          <strong>{formatDurationMs(vacationDurationMs)}</strong>
+        </div>
 
         {/* Date range filter */}
         <div className="export-range-group">

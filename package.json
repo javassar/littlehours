@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node test/milestone-3-6.test.mjs"
   },
   "dependencies": {
     "@fontsource/cormorant-garamond": "^5.1.0",

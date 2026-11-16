@@ -1,5 +1,5 @@
 /**
- * Milestone 2.1: In-code validation for Gemini parse-entry responses
+ * Milestone 2.1 & 3.7: In-code validation for Gemini parse-entry responses
  */
 
 export interface RawSegment {
@@ -7,6 +7,7 @@ export interface RawSegment {
   end_time: string;
   activity_label: string;
   category: string;
+  company?: string[];
 }
 
 export interface ParseResponse {
@@ -18,6 +19,7 @@ export interface ParseResponse {
 export interface ValidationResult {
   valid: boolean;
   error?: string;
+  sanitizedSegments?: RawSegment[];
 }
 
 const ONE_MINUTE_MS = 60 * 1000;
@@ -26,7 +28,11 @@ export function validateParseResult(
   result: unknown,
   windowStartStr: string,
   windowEndStr: string,
-  allowedCategories: string[]
+  allowedCategories: string[] | Array<{ name: string; description?: string }>,
+  options?: {
+    onVacation?: boolean;
+    companyUsed?: string[];
+  }
 ): ValidationResult {
   if (!result || typeof result !== 'object') {
     return { valid: false, error: 'Model reply is not a valid JSON object.' };
@@ -68,7 +74,16 @@ export function validateParseResult(
     return { valid: false, error: 'Invalid window start/end timestamps provided.' };
   }
 
-  const normalizedCategories = new Set(allowedCategories.map((c) => c.trim().toLowerCase()));
+  // Normalize allowed categories list (handles both string[] and CategoryItem[])
+  const categoryNames = allowedCategories.map((c) =>
+    typeof c === 'string' ? c.trim().toLowerCase() : c.name.trim().toLowerCase()
+  );
+  const normalizedCategories = new Set(categoryNames);
+
+  const companyUsed = options?.companyUsed || [];
+  const onVacation = Boolean(options?.onVacation);
+
+  const sanitizedSegments: RawSegment[] = [];
 
   // Validate each segment
   for (let i = 0; i < segments.length; i++) {
@@ -85,7 +100,12 @@ export function validateParseResult(
       return { valid: false, error: `Segment #${i + 1} is missing a category.` };
     }
 
-    if (!normalizedCategories.has(s.category.trim().toLowerCase())) {
+    let finalCategory = s.category.trim().toLowerCase();
+
+    // Milestone 3.7: If on_vacation is true, set every segment's category to "vacation" in code
+    if (onVacation) {
+      finalCategory = 'vacation';
+    } else if (!normalizedCategories.has(finalCategory)) {
       return {
         valid: false,
         error: `Segment #${i + 1} has category '${s.category}' which is not in the allowed category list.`,
@@ -108,16 +128,49 @@ export function validateParseResult(
         error: `Segment #${i + 1} end_time (${s.end_time}) is not after start_time (${s.start_time}).`,
       };
     }
+
+    // Milestone 3.7: Validate and sanitize company array
+    // - Trim each name, drop empty ones
+    // - Allow at most 8 names and at most 40 characters per name
+    // - Remove duplicates ignoring case
+    // - When a returned name matches a name in company_used ignoring case, replace with stored spelling
+    const rawCompany = Array.isArray(s.company) ? s.company : [];
+    const sanitizedCompany: string[] = [];
+    const seenLower = new Set<string>();
+
+    for (const rawName of rawCompany) {
+      if (typeof rawName !== 'string') continue;
+      const trimmed = rawName.trim();
+      if (!trimmed || trimmed.length > 40) continue;
+
+      const lower = trimmed.toLowerCase();
+      if (seenLower.has(lower)) continue;
+      seenLower.add(lower);
+
+      // Match against company_used ignoring case
+      const matchedCanonical = companyUsed.find((c) => c.trim().toLowerCase() === lower);
+      sanitizedCompany.push(matchedCanonical ? matchedCanonical.trim() : trimmed);
+
+      if (sanitizedCompany.length >= 8) break;
+    }
+
+    sanitizedSegments.push({
+      start_time: s.start_time,
+      end_time: s.end_time,
+      activity_label: s.activity_label.trim().toLowerCase(),
+      category: finalCategory,
+      company: sanitizedCompany,
+    });
   }
 
   // Check chronological sorting and contiguity
-  for (let i = 0; i < segments.length; i++) {
-    const segStart = new Date(segments[i].start_time).getTime();
-    const segEnd = new Date(segments[i].end_time).getTime();
+  for (let i = 0; i < sanitizedSegments.length; i++) {
+    const segStart = new Date(sanitizedSegments[i].start_time).getTime();
+    const segEnd = new Date(sanitizedSegments[i].end_time).getTime();
 
     if (i > 0) {
-      const prevEnd = new Date(segments[i - 1].end_time).getTime();
-      const prevStart = new Date(segments[i - 1].start_time).getTime();
+      const prevEnd = new Date(sanitizedSegments[i - 1].end_time).getTime();
+      const prevStart = new Date(sanitizedSegments[i - 1].start_time).getTime();
 
       if (segStart < prevStart) {
         return {
@@ -131,31 +184,31 @@ export function validateParseResult(
       if (diff > ONE_MINUTE_MS) {
         return {
           valid: false,
-          error: `Segments are not contiguous: Segment #${i} ends at ${segments[i - 1].end_time} but Segment #${i + 1} starts at ${segments[i].start_time} (difference of ${Math.round(diff / 1000)}s exceeds 1 minute).`,
+          error: `Segments are not contiguous: Segment #${i} ends at ${sanitizedSegments[i - 1].end_time} but Segment #${i + 1} starts at ${sanitizedSegments[i].start_time} (difference of ${Math.round(diff / 1000)}s exceeds 1 minute).`,
         };
       }
     }
   }
 
   // Check window coverage within 1 minute
-  const firstStart = new Date(segments[0].start_time).getTime();
-  const lastEnd = new Date(segments[segments.length - 1].end_time).getTime();
+  const firstStart = new Date(sanitizedSegments[0].start_time).getTime();
+  const lastEnd = new Date(sanitizedSegments[sanitizedSegments.length - 1].end_time).getTime();
 
   if (Math.abs(firstStart - windowStart) > ONE_MINUTE_MS) {
     return {
       valid: false,
-      error: `First segment start (${segments[0].start_time}) does not match window_start (${windowStartStr}) within 1 minute.`,
+      error: `First segment start (${sanitizedSegments[0].start_time}) does not match window_start (${windowStartStr}) within 1 minute.`,
     };
   }
 
   if (Math.abs(lastEnd - windowEnd) > ONE_MINUTE_MS) {
     return {
       valid: false,
-      error: `Last segment end (${segments[segments.length - 1].end_time}) does not match window_end (${windowEndStr}) within 1 minute.`,
+      error: `Last segment end (${sanitizedSegments[sanitizedSegments.length - 1].end_time}) does not match window_end (${windowEndStr}) within 1 minute.`,
     };
   }
 
-  const totalSegmentMs = segments.reduce((acc, s) => {
+  const totalSegmentMs = sanitizedSegments.reduce((acc, s) => {
     return acc + (new Date(s.end_time).getTime() - new Date(s.start_time).getTime());
   }, 0);
   const totalWindowMs = windowEnd - windowStart;
@@ -167,5 +220,5 @@ export function validateParseResult(
     };
   }
 
-  return { valid: true };
+  return { valid: true, sanitizedSegments };
 }

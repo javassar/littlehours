@@ -95,6 +95,7 @@ export const HistoryPage: React.FC = () => {
             parse_status,
             clarification_question,
             follow_ups,
+            on_vacation,
             created_at,
             segments (
               id,
@@ -103,6 +104,7 @@ export const HistoryPage: React.FC = () => {
               end_time,
               activity_label,
               category,
+              company,
               confirmed,
               model,
               prompt_version
@@ -179,6 +181,7 @@ export const HistoryPage: React.FC = () => {
           parse_status,
           clarification_question,
           follow_ups,
+          on_vacation,
           segments (
             id,
             entry_id,
@@ -186,6 +189,7 @@ export const HistoryPage: React.FC = () => {
             end_time,
             activity_label,
             category,
+            company,
             confirmed,
             model,
             prompt_version
@@ -236,7 +240,7 @@ export const HistoryPage: React.FC = () => {
   // Handle entry edit save (supports both queued offline and synced entries)
   const handleSaveEntry = async (
     id: string,
-    updated: { raw_text: string; window_start: string; window_end: string }
+    updated: { raw_text: string; window_start: string; window_end: string; on_vacation?: boolean }
   ) => {
     const isQueued = queuedEntries.some((e) => e.id === id);
 
@@ -247,6 +251,7 @@ export const HistoryPage: React.FC = () => {
         raw_text: updated.raw_text,
         window_start: updated.window_start,
         window_end: updated.window_end,
+        on_vacation: Boolean(updated.on_vacation),
         parse_status: 'pending',
         follow_ups: [],
         created_at: new Date().toISOString(),
@@ -262,6 +267,7 @@ export const HistoryPage: React.FC = () => {
         raw_text: updated.raw_text,
         window_start: updated.window_start,
         window_end: updated.window_end,
+        on_vacation: Boolean(updated.on_vacation),
         parse_status: 'pending',
         updated_at: new Date().toISOString(),
       })
@@ -330,13 +336,15 @@ export const HistoryPage: React.FC = () => {
     if (!selectedConfirmationEntry || !user) return;
 
     const entryId = selectedConfirmationEntry.id;
-    const defaultCat = settings?.categories?.[0] || 'work';
+    const firstCat = settings?.categories?.[0];
+    const defaultCat = (typeof firstCat === 'object' ? (firstCat as any).name : firstCat) || 'work';
 
     const newSegmentsPayload = updatedSegments.map((s) => ({
       id: s.id || crypto.randomUUID(),
       entry_id: entryId,
       activity_label: (s.activity_label || 'unlabeled').trim().toLowerCase(),
       category: s.category || defaultCat,
+      company: Array.isArray(s.company) ? s.company : [],
       start_time: s.start_time,
       end_time: s.end_time,
       confirmed: true,
@@ -366,6 +374,8 @@ export const HistoryPage: React.FC = () => {
     if (!selectedConfirmationEntry || !user) return;
 
     const entryId = selectedConfirmationEntry.id;
+    const firstCat = settings?.categories?.[0];
+    const defaultCat = (typeof firstCat === 'object' ? (firstCat as any).name : firstCat) || 'work';
 
     await supabase.from('segments').delete().eq('entry_id', entryId);
     const toInsert = updatedSegments.map((s) => ({
@@ -373,7 +383,8 @@ export const HistoryPage: React.FC = () => {
       entry_id: entryId,
       user_id: user.id,
       activity_label: (s.activity_label || 'unlabeled').trim().toLowerCase(),
-      category: s.category || (settings?.categories?.[0] || 'work'),
+      category: s.category || defaultCat,
+      company: Array.isArray(s.company) ? s.company : [],
       start_time: s.start_time,
       end_time: s.end_time,
       confirmed: false,
@@ -443,7 +454,8 @@ export const HistoryPage: React.FC = () => {
 
   // Milestone 2.4: "Fix it by hand" opens segment editor with one empty row covering the window
   const handleFixByHand = (entry: EntryItem) => {
-    const defaultCat = (settings?.categories && settings.categories[0]) || 'work';
+    const firstCat = settings?.categories?.[0];
+    const defaultCat = (typeof firstCat === 'object' ? (firstCat as any).name : firstCat) || 'work';
     const emptyRow: SegmentItem = {
       id: crypto.randomUUID(),
       entry_id: entry.id,
@@ -695,20 +707,32 @@ export const HistoryPage: React.FC = () => {
                       </div>
                     )}
 
-                    {/* 3. Parsed segments: time range, label, category chip */}
+                    {/* 3. Parsed segments: time range, label, company chips, category chip */}
                     {entry.segments && entry.segments.length > 0 && (
                       <div className="history-card-segments">
                         {entry.segments.map((seg) => {
                           const segStart = new Date(seg.start_time);
                           const segEnd = new Date(seg.end_time);
                           const segRange = formatTimeRange(segStart, segEnd, timeZone);
+                          const isVacation = seg.category === 'vacation' || entry.on_vacation;
                           return (
                             <div key={seg.id} className="history-segment-item">
                               <div className="history-segment-left">
                                 <span className="history-segment-time">{segRange}</span>
                                 <span className="history-segment-label">{seg.activity_label}</span>
                               </div>
-                              <Chip label={seg.category} size="sm" />
+                              <div className="history-segment-chips">
+                                {Array.isArray(seg.company) &&
+                                  seg.company.map((person) => (
+                                    <span key={person} className="company-chip">
+                                      {person}
+                                    </span>
+                                  ))}
+                                <Chip label={seg.category} size="sm" />
+                                {isVacation && seg.category !== 'vacation' && (
+                                  <Chip label="vacation" size="sm" tint="sage" />
+                                )}
+                              </div>
                             </div>
                           );
                         })}
@@ -836,6 +860,14 @@ export const HistoryPage: React.FC = () => {
         }}
         onConfirm={handleConfirmSegments}
         onSaveUnconfirmed={handleSaveUnconfirmedSegments}
+        onEditEntry={() => {
+          if (selectedConfirmationEntry) {
+            setSelectedEntry(selectedConfirmationEntry);
+            setIsConfirmationOpen(false);
+            setSelectedConfirmationEntry(null);
+            setIsEditOpen(true);
+          }
+        }}
       />
 
       {/* Edit & Delete sheet */}

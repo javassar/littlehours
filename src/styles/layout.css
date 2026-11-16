@@ -478,6 +478,68 @@
   text-overflow: ellipsis;
 }
 
+.history-segment-chips {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.company-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--rose-deep);
+  color: var(--mauve);
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.25;
+  background: transparent;
+}
+
+/* Vacation Mode Ribbon & Log Switch (Milestone 3.7) */
+.vacation-mode-ribbon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background-color: rgba(201, 187, 214, 0.45);
+  color: var(--ink);
+  border: 1px solid rgba(142, 107, 122, 0.35);
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  margin: 0 auto 14px auto;
+  max-width: 320px;
+  text-align: center;
+  box-shadow: 0 1px 4px rgba(75, 51, 64, 0.06);
+}
+
+.log-vacation-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 6px auto 14px auto;
+}
+
+.log-vacation-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--mauve);
+  cursor: pointer;
+  user-select: none;
+}
+
 /* Dotted unlogged gap line between entries */
 .history-gap-indicator {
   display: flex;

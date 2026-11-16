@@ -8,6 +8,7 @@ export interface ExportSegment {
   end_time: string;
   activity_label: string;
   category: string;
+  company?: string[];
   confirmed?: boolean;
 }
 
@@ -17,6 +18,7 @@ export interface ExportEntry {
   window_end: string;
   raw_text: string;
   created_at: string;
+  on_vacation?: boolean;
   follow_ups?: any[];
   segments?: ExportSegment[];
 }
@@ -33,6 +35,8 @@ export interface FormattedExportRow {
   local_end: string;
   activity_label?: string;
   category?: string;
+  company: string[];
+  on_vacation: boolean;
   confirmed?: string;
   raw_text: string;
   follow_ups?: string;
@@ -121,6 +125,8 @@ export function prepareExportRows(
           local_end: formatLocalTime(segEnd, timeZone),
           activity_label: seg.activity_label,
           category: seg.category,
+          company: Array.isArray(seg.company) ? seg.company : [],
+          on_vacation: Boolean(entry.on_vacation),
           confirmed: seg.confirmed ? 'true' : 'false',
           raw_text: entry.raw_text,
           follow_ups: followUpsStr,
@@ -143,6 +149,8 @@ export function prepareExportRows(
         local_end: formatLocalTime(winEnd, timeZone),
         activity_label: '',
         category: '',
+        company: [],
+        on_vacation: Boolean(entry.on_vacation),
         confirmed: 'false',
         raw_text: entry.raw_text,
         follow_ups: followUpsStr,
@@ -156,7 +164,7 @@ export function prepareExportRows(
 
 /**
  * Generate CSV string from export rows.
- * Supports both updated segment-level export (Milestone 2.6) and entry-level format.
+ * Supports both updated segment-level export (Milestone 2.6 & 3.7) and entry-level format.
  */
 export function generateCSV(rows: FormattedExportRow[]): string {
   const isSegmentExport =
@@ -170,6 +178,7 @@ export function generateCSV(rows: FormattedExportRow[]): string {
       'window_end',
       'local_start',
       'local_end',
+      'on_vacation',
       'raw_text',
       'created_at',
     ];
@@ -182,6 +191,7 @@ export function generateCSV(rows: FormattedExportRow[]): string {
         escapeCSVCell(row.window_end),
         escapeCSVCell(row.local_start),
         escapeCSVCell(row.local_end),
+        escapeCSVCell(row.on_vacation ? 'true' : 'false'),
         escapeCSVCell(row.raw_text),
         escapeCSVCell(row.created_at),
       ].join(',')
@@ -190,7 +200,7 @@ export function generateCSV(rows: FormattedExportRow[]): string {
     return [headerLine, ...rowLines].join('\r\n');
   }
 
-  // Milestone 2.6 segment-level headers
+  // Milestone 2.6 & 3.7 segment-level headers
   const headers = [
     'entry_id',
     'segment_id',
@@ -200,6 +210,8 @@ export function generateCSV(rows: FormattedExportRow[]): string {
     'local_end',
     'activity_label',
     'category',
+    'company',
+    'on_vacation',
     'confirmed',
     'raw_text',
     'follow_ups',
@@ -217,6 +229,8 @@ export function generateCSV(rows: FormattedExportRow[]): string {
       escapeCSVCell(row.local_end),
       escapeCSVCell(row.activity_label || ''),
       escapeCSVCell(row.category || ''),
+      escapeCSVCell((row.company || []).join('; ')),
+      escapeCSVCell(row.on_vacation ? 'true' : 'false'),
       escapeCSVCell(row.confirmed || 'false'),
       escapeCSVCell(row.raw_text),
       escapeCSVCell(row.follow_ups || ''),

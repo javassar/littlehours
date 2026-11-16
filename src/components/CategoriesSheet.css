@@ -93,26 +93,71 @@
   max-height: calc(88vh - 120px);
 }
 
-/* Add Category Input Form */
-.categories-add-form {
+/* Note: Re-read banner */
+.categories-note-banner {
   display: flex;
-  gap: 8px;
   align-items: center;
+  gap: 6px;
+  background-color: rgba(201, 187, 214, 0.3);
+  border: 1px solid rgba(142, 107, 122, 0.25);
+  border-radius: 12px;
+  padding: 8px 12px;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.categories-note-bullet {
+  color: var(--rose-deep);
+  font-size: 11px;
+}
+
+/* Add Category Input Form */
+.categories-add-form-expanded {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background-color: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(184, 114, 127, 0.25);
+  border-radius: 16px;
+  padding: 12px;
+}
+
+.categories-add-heading {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
 }
 
 .categories-add-input {
-  flex: 1;
   font-family: var(--font-body);
-  font-size: 16px;
+  font-size: 15px;
   color: var(--ink);
   background-color: var(--surface-sunk);
   border: 1px solid rgba(184, 114, 127, 0.3);
   border-radius: var(--radius-input);
-  padding: 8px 14px;
+  padding: 8px 12px;
   outline: none;
 }
 
-.categories-add-input:focus {
+.categories-add-desc-input {
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink);
+  background-color: var(--surface-sunk);
+  border: 1px solid rgba(184, 114, 127, 0.3);
+  border-radius: 12px;
+  padding: 8px 12px;
+  outline: none;
+  resize: vertical;
+}
+
+.categories-add-input:focus,
+.categories-add-desc-input:focus {
   border-color: var(--rose-deep);
   outline: 2px solid var(--gold);
 }
@@ -127,7 +172,7 @@
   border-radius: var(--radius-button);
   padding: 9px 16px;
   cursor: pointer;
-  white-space: nowrap;
+  align-self: flex-start;
   box-shadow: 0 2px 6px rgba(75, 51, 64, 0.1);
   transition: all var(--transition-fast);
 }
@@ -146,18 +191,24 @@
 .categories-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
-.category-row {
+.category-row-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background-color: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(184, 114, 127, 0.2);
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+
+.category-row-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  background-color: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(184, 114, 127, 0.2);
-  border-radius: 14px;
-  padding: 8px 12px;
 }
 
 .category-row-left {
@@ -208,7 +259,7 @@
   border: none;
   color: var(--mauve);
   cursor: pointer;
-  padding: 4px;
+  padding: 4px 6px;
   border-radius: 6px;
   font-size: 12px;
   display: flex;
@@ -259,6 +310,11 @@
   cursor: pointer;
 }
 
+.category-inline-save-btn:hover:not(:disabled) {
+  background-color: var(--rose-deep);
+  color: #fff;
+}
+
 .category-inline-cancel-btn {
   font-family: var(--font-body);
   font-size: 12px;
@@ -267,6 +323,77 @@
   color: var(--mauve);
   cursor: pointer;
   padding: 4px 6px;
+}
+
+/* Category description row */
+.category-row-desc-section {
+  padding-left: 26px; /* indent to align with chip */
+}
+
+.category-desc-display {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.category-desc-text {
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--mauve);
+  margin: 0;
+  flex: 1;
+}
+
+.category-desc-empty {
+  font-style: italic;
+  opacity: 0.6;
+}
+
+.category-desc-edit-btn {
+  background: none;
+  border: none;
+  color: var(--mauve);
+  font-family: var(--font-body);
+  font-size: 11px;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 1px 4px;
+  opacity: 0.75;
+  transition: opacity var(--transition-fast), color var(--transition-fast);
+}
+
+.category-desc-edit-btn:hover {
+  opacity: 1;
+  color: var(--rose-deep);
+}
+
+.category-desc-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.category-desc-textarea {
+  width: 100%;
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--ink);
+  background-color: var(--surface-sunk);
+  border: 1px solid var(--rose-deep);
+  border-radius: 8px;
+  padding: 6px 8px;
+  outline: none;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.category-desc-edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* In-sheet alert / blocked error banner */

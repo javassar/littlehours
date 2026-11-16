@@ -396,3 +396,72 @@
   gap: 8px;
   flex-shrink: 0;
 }
+
+/* Company chips & input (Milestone 3.7) */
+.confirmation-company-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.company-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--rose-deep);
+  color: var(--mauve);
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.25;
+  background: transparent;
+}
+
+.company-chip-remove {
+  background: none;
+  border: none;
+  color: var(--rose-deep);
+  font-size: 13px;
+  line-height: 1;
+  padding: 0 1px;
+  margin-left: 2px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+
+.company-chip-remove:hover {
+  color: var(--danger);
+}
+
+.confirmation-company-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.confirmation-company-input-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.confirmation-company-input {
+  width: 100%;
+  padding: 6px 10px;
+  background-color: var(--surface-sunk);
+  border: 1px solid rgba(184, 114, 127, 0.2);
+  border-radius: 12px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--ink);
+  box-sizing: border-box;
+}
+
+.confirmation-company-input:focus {
+  outline: 2px solid var(--gold);
+  border-color: transparent;
+}

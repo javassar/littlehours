@@ -1,21 +1,67 @@
 import { supabase, isSupabaseConfigured } from './supabase.ts';
 
-export const STARTER_CATEGORIES = [
-  'work',
-  'job search',
-  'phone and social media',
-  'sleep',
-  'exercise',
-  'meals',
-  'chores',
-  'social time',
-  'reading',
-  'entertainment',
-  'travel',
-  'personal care',
-  'errands',
-  'rest',
+export interface CategoryItem {
+  name: string;
+  description: string;
+}
+
+export const STARTER_CATEGORIES: CategoryItem[] = [
+  { name: 'work', description: 'Paid or assigned work, including freelance work and work for family.' },
+  { name: 'job search', description: 'Applications, resumes, cover letters, job boards, and interview prep.' },
+  { name: 'networking', description: 'Conversations or messages with career contacts, including informational chats and follow-ups.' },
+  { name: 'professional development', description: 'Learning and building skills for my field: courses, tutorials, reading about my field, and portfolio or skill-building projects.' },
+  { name: 'admin', description: 'Paperwork, money, accounts, scheduling, and inbox upkeep: bills, taxes, forms, passwords, booking and rescheduling. Paperwork that serves one other category belongs to that category (an insurance claim is healthcare, application forms are job search). Never use for tasks that are not paperwork or logistics.' },
+  { name: 'doomscrolling', description: 'Scrolling any app or site mindlessly or compulsively. Only when the text signals it.' },
+  { name: 'social media', description: 'Chosen use of apps like Pinterest and BeReal, including browsing, posting, and commenting.' },
+  { name: 'entertainment', description: 'Chosen content or routine viewing, alone or with others: TV, movies, YouTube videos, podcasts, music, and games. Not a ticketed or invited occasion.' },
+  { name: 'events', description: 'Ticketed, invited, or formally scheduled occasions: ballet, concerts, theater, weddings, parties, games. Outranks entertainment, social time, and social meals.' },
+  { name: 'texting', description: 'Messaging with friends and family. Career messages go to networking or job search.' },
+  { name: 'social time', description: 'Time where interacting with people is the activity: visits, talking, calls and video calls, hanging out.' },
+  { name: 'sleep', description: 'Sleeping, and lying in bed trying to fall asleep.' },
+  { name: 'exercise', description: 'Workouts, walks for fitness, sports, and stretching.' },
+  { name: 'functional meals', description: 'Preparing and eating ordinary meals, alone or with the people I live with. Dishes and cleanup are chores.' },
+  { name: 'social meals', description: 'Meals out or hosted where the meal is also the social occasion. Formally invited meals are events.' },
+  { name: 'chores', description: 'Housework inside the home: cleaning, laundry, dishes, tidying.' },
+  { name: 'errands', description: 'Necessary tasks outside the home: groceries, bank, post office, returns.' },
+  { name: 'shopping', description: 'Browsing or buying things I want, in store or online.' },
+  { name: 'reading', description: 'Reading books or long-form pieces for pleasure. Reading about my field is professional development.' },
+  { name: 'piano', description: 'Playing, practicing, or learning piano.' },
+  { name: 'hobbies', description: 'Hobbies without their own category: crafts, baking for fun, writing, journaling. Specifics go in the label.' },
+  { name: 'hygiene', description: 'Daily basics: showering, brushing teeth, getting dressed, skincare routine.' },
+  { name: 'personal care', description: 'Occasional or discretionary care: hair, nails, spa, massage, self-care sessions.' },
+  { name: 'healthcare', description: 'Appointments, medication, therapy, and related pharmacy trips.' },
+  { name: 'vacation', description: 'Everything while on a trip, from leaving home until returning. Overrides all other categories.' },
 ];
+
+/**
+ * Normalizes categories from settings (handles legacy string[] or CategoryItem[]).
+ */
+export function normalizeCategories(raw: unknown): CategoryItem[] {
+  if (!Array.isArray(raw)) return STARTER_CATEGORIES;
+  return raw.map((item) => {
+    if (typeof item === 'string') {
+      const clean = item.trim().toLowerCase();
+      // Apply rename aliases
+      const aliased = clean === 'digital media time' ? 'social media' : clean === 'misc hobby' ? 'hobbies' : clean;
+      const found = STARTER_CATEGORIES.find((c) => c.name.toLowerCase() === aliased);
+      return {
+        name: aliased,
+        description: found?.description || '',
+      };
+    }
+    if (item && typeof item === 'object') {
+      const obj = item as { name?: string; description?: string };
+      const rawName = String(obj.name || '').trim().toLowerCase();
+      const aliased = rawName === 'digital media time' ? 'social media' : rawName === 'misc hobby' ? 'hobbies' : rawName;
+      const found = STARTER_CATEGORIES.find((c) => c.name.toLowerCase() === aliased);
+      return {
+        name: aliased,
+        description: String(obj.description || found?.description || ''),
+      };
+    }
+    return { name: String(item), description: '' };
+  });
+}
 
 export interface UserSettings {
   user_id: string;
@@ -24,7 +70,8 @@ export interface UserSettings {
   reminder_start_hour: number;
   reminder_end_hour: number;
   snooze_until: string | null;
-  categories: string[];
+  categories: CategoryItem[];
+  vacation_mode?: boolean;
 }
 
 /**
@@ -49,11 +96,14 @@ export async function ensureUserSettings(userId: string): Promise<UserSettings |
     }
 
     if (existing) {
-      return existing as UserSettings;
+      return {
+        ...existing,
+        categories: normalizeCategories(existing.categories),
+      } as UserSettings;
     }
 
     // 2. If row does not exist, create it with default starter values
-    const newSettings: UserSettings = {
+    const newSettings = {
       user_id: userId,
       timezone: 'America/Phoenix',
       reminders_enabled: true,
@@ -61,6 +111,7 @@ export async function ensureUserSettings(userId: string): Promise<UserSettings |
       reminder_end_hour: 23,
       snooze_until: null,
       categories: STARTER_CATEGORIES,
+      vacation_mode: false,
     };
 
     const { data: created, error: insertError } = await supabase
@@ -71,10 +122,13 @@ export async function ensureUserSettings(userId: string): Promise<UserSettings |
 
     if (insertError) {
       console.error('Error creating starter settings row:', insertError.message);
-      return newSettings;
+      return newSettings as UserSettings;
     }
 
-    return created as UserSettings;
+    return {
+      ...created,
+      categories: normalizeCategories(created.categories),
+    } as UserSettings;
   } catch (err) {
     console.error('Failed to ensure user settings:', err);
     return null;
@@ -82,17 +136,41 @@ export async function ensureUserSettings(userId: string): Promise<UserSettings |
 }
 
 /**
- * Milestone 2.6: Update categories list in user settings
+ * Milestone 2.6 & 3.7: Update categories list in user settings
  */
-export async function updateUserCategories(userId: string, newCategories: string[]): Promise<void> {
+export async function updateUserCategories(
+  userId: string,
+  newCategories: CategoryItem[] | string[]
+): Promise<void> {
+  const normalized = normalizeCategories(newCategories);
   const { error } = await supabase
     .from('settings')
-    .update({ categories: newCategories })
+    .update({ categories: normalized })
     .eq('user_id', userId);
 
   if (error) {
     throw new Error(`Failed to update categories: ${error.message}`);
   }
+}
+
+/**
+ * Milestone 3.7: Update a category's description in place
+ */
+export async function updateCategoryDescription(
+  userId: string,
+  categoryName: string,
+  newDescription: string,
+  currentCategories: CategoryItem[]
+): Promise<CategoryItem[]> {
+  const cleanName = categoryName.trim().toLowerCase();
+  const updated = currentCategories.map((c) =>
+    c.name.trim().toLowerCase() === cleanName
+      ? { ...c, description: newDescription.trim() }
+      : c
+  );
+
+  await updateUserCategories(userId, updated);
+  return updated;
 }
 
 /**
@@ -113,14 +191,14 @@ export async function getCategoryUsageCount(userId: string, category: string): P
 }
 
 /**
- * Milestone 2.6: Rename a category across settings and all existing segments
+ * Milestone 2.6 & 3.7: Rename a category across settings and all existing segments
  */
 export async function renameCategory(
   userId: string,
   oldName: string,
   newName: string,
-  currentCategories: string[]
-): Promise<{ updatedCount: number; newCategories: string[] }> {
+  currentCategories: CategoryItem[]
+): Promise<{ updatedCount: number; newCategories: CategoryItem[] }> {
   const cleanOld = oldName.trim().toLowerCase();
   const cleanNew = newName.trim().toLowerCase();
 
@@ -130,7 +208,7 @@ export async function renameCategory(
 
   // Update in category list
   const newCategories = currentCategories.map((c) =>
-    c.trim().toLowerCase() === cleanOld ? cleanNew : c
+    c.name.trim().toLowerCase() === cleanOld ? { ...c, name: cleanNew } : c
   );
 
   // 1. Update settings
@@ -155,13 +233,13 @@ export async function renameCategory(
 }
 
 /**
- * Milestone 2.6: Delete a category (blocked if segments use it)
+ * Milestone 2.6 & 3.7: Delete a category (blocked if segments use it)
  */
 export async function deleteCategory(
   userId: string,
   category: string,
-  currentCategories: string[]
-): Promise<{ success: boolean; usageCount?: number; newCategories?: string[] }> {
+  currentCategories: CategoryItem[]
+): Promise<{ success: boolean; usageCount?: number; newCategories?: CategoryItem[] }> {
   const cleanCat = category.trim().toLowerCase();
   const usageCount = await getCategoryUsageCount(userId, cleanCat);
 
@@ -170,11 +248,185 @@ export async function deleteCategory(
   }
 
   const newCategories = currentCategories.filter(
-    (c) => c.trim().toLowerCase() !== cleanCat
+    (c) => c.name.trim().toLowerCase() !== cleanCat
   );
 
   await updateUserCategories(userId, newCategories);
   return { success: true, newCategories };
+}
+
+/**
+ * Milestone 3.7: Person statistics for the People screen
+ */
+export interface PersonStat {
+  name: string;
+  count: number;
+  totalMinutes: number;
+}
+
+/**
+ * Milestone 3.7: Load stats for every person in segments.company
+ */
+export async function getPeopleStats(userId: string): Promise<PersonStat[]> {
+  const { data: segments, error } = await supabase
+    .from('segments')
+    .select('start_time, end_time, company')
+    .eq('user_id', userId);
+
+  if (error || !segments) {
+    console.warn('Error loading people stats:', error?.message);
+    return [];
+  }
+
+  const map = new Map<string, { count: number; totalMinutes: number }>();
+
+  for (const seg of segments) {
+    const rawCompany: string[] = Array.isArray(seg.company) ? seg.company : [];
+    const startMs = new Date(seg.start_time).getTime();
+    const endMs = new Date(seg.end_time).getTime();
+    const durationMinutes = Math.max(0, Math.round((endMs - startMs) / 60000));
+
+    // Deduplicate names within the same segment ignoring case
+    const seenInSeg = new Set<string>();
+    for (const rawName of rawCompany) {
+      const cleanName = rawName.trim();
+      if (!cleanName) continue;
+      const lower = cleanName.toLowerCase();
+      if (seenInSeg.has(lower)) continue;
+      seenInSeg.add(lower);
+
+      const existing = map.get(lower);
+      if (existing) {
+        existing.count += 1;
+        existing.totalMinutes += durationMinutes;
+      } else {
+        map.set(lower, { count: 1, totalMinutes: durationMinutes });
+      }
+    }
+  }
+
+  // Preserve proper capitalization by searching first appearance
+  const stats: PersonStat[] = [];
+  for (const [lower, data] of map.entries()) {
+    // Find canonical name casing from segments
+    let canonical = lower;
+    for (const seg of segments) {
+      const match = (seg.company || []).find(
+        (n: string) => n.trim().toLowerCase() === lower
+      );
+      if (match) {
+        canonical = match.trim();
+        break;
+      }
+    }
+
+    stats.push({
+      name: canonical,
+      count: data.count,
+      totalMinutes: data.totalMinutes,
+    });
+  }
+
+  return stats.sort((a, b) => b.totalMinutes - a.totalMinutes);
+}
+
+/**
+ * Milestone 3.7: Rename a person across all segments (merging if newName exists)
+ */
+export async function renamePerson(
+  userId: string,
+  oldName: string,
+  newName: string
+): Promise<{ updatedCount: number }> {
+  const cleanOld = oldName.trim().toLowerCase();
+  const cleanNew = newName.trim();
+
+  if (!cleanNew) {
+    throw new Error('New name cannot be empty');
+  }
+
+  // Load all segments containing oldName
+  const { data: segments, error } = await supabase
+    .from('segments')
+    .select('id, company')
+    .eq('user_id', userId);
+
+  if (error || !segments) {
+    throw new Error(`Failed to load segments: ${error?.message}`);
+  }
+
+  let updatedCount = 0;
+  for (const seg of segments) {
+    const company: string[] = Array.isArray(seg.company) ? seg.company : [];
+    const hasOld = company.some((n) => n.trim().toLowerCase() === cleanOld);
+    if (!hasOld) continue;
+
+    // Replace old with new, deduplicate case-insensitively
+    const updatedCompany: string[] = [];
+    const seen = new Set<string>();
+
+    for (const n of company) {
+      const target = n.trim().toLowerCase() === cleanOld ? cleanNew : n.trim();
+      if (!target) continue;
+      if (!seen.has(target.toLowerCase())) {
+        seen.add(target.toLowerCase());
+        updatedCompany.push(target);
+      }
+    }
+
+    await supabase
+      .from('segments')
+      .update({ company: updatedCompany })
+      .eq('id', seg.id);
+
+    updatedCount++;
+  }
+
+  return { updatedCount };
+}
+
+/**
+ * Milestone 3.7: Delete a person from all segments' company arrays
+ */
+export async function deletePerson(
+  userId: string,
+  nameToDelete: string
+): Promise<{ updatedCount: number }> {
+  const cleanTarget = nameToDelete.trim().toLowerCase();
+
+  const { data: segments, error } = await supabase
+    .from('segments')
+    .select('id, company')
+    .eq('user_id', userId);
+
+  if (error || !segments) {
+    throw new Error(`Failed to load segments: ${error?.message}`);
+  }
+
+  let updatedCount = 0;
+  for (const seg of segments) {
+    const company: string[] = Array.isArray(seg.company) ? seg.company : [];
+    const hasTarget = company.some((n) => n.trim().toLowerCase() === cleanTarget);
+    if (!hasTarget) continue;
+
+    const filtered = company.filter((n) => n.trim().toLowerCase() !== cleanTarget);
+
+    await supabase
+      .from('segments')
+      .update({ company: filtered })
+      .eq('id', seg.id);
+
+    updatedCount++;
+  }
+
+  return { updatedCount };
+}
+
+/**
+ * Milestone 3.7: Toggle or update vacation_mode on user settings
+ */
+export async function setVacationMode(userId: string, vacationMode: boolean): Promise<void> {
+  await updateUserSettings(userId, { vacation_mode: vacationMode } as Partial<UserSettings>);
 }
 
 /**

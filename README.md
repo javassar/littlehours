@@ -110,9 +110,15 @@ npm run preview
 - [x] **Milestone 2.5**: Automatic segment overlap reconciliation (trimming and splitting) via transactional RPC.
 - [x] **Milestone 2.6**: Category management (add, rename, reorder, delete protection), batch re-reading, and export with segments.
 
-### Stage 3: Push Reminders
+### Stage 3: Push Reminders & Intelligence
 - [x] **Milestone 3.1**: VAPID keys, push subscription management, standalone PWA detection, and Settings UI.
 - [x] **Milestone 3.2**: Service worker push event handling (`tag: 'hourly'` replacement) and notification click auto-focus (`/?focus=1`).
 - [x] **Milestone 3.3**: Hourly sender Edge Function (`send-reminders`), quiet hours enforcement (8 AM - 11 PM), subscription pruning (404/410), and `pg_cron` schedule.
 - [x] **Milestone 3.4**: Reminder schedule controls, 1-hour snooze support, test reminder trigger, and friendly next reminder calculations.
 - [x] **Milestone 3.5**: Intelligent skip when user has logged within the last 30 minutes, with detailed logging of skip reasons.
+- [x] **Milestone 3.7**: Categories, Company Field, and Vacation Mode:
+  - **Database additions**: `segments.company text[]` with GIN index, `entries.on_vacation boolean`, `settings.vacation_mode boolean`, `settings.categories` updated to 25 objects with `{ name, description }`.
+  - **AI Parser v2**: Prompt version `v2` in `parse-entry` with tie-break rules, company extraction with casing canonicalization, and `on_vacation` override.
+  - **Vacation Mode Switch**: Persistent vacation toggle on Log screen with `--lavender` reminder ribbon and entry edit sheet toggle.
+  - **Company & People Screen**: Outlined company chips on confirmation and history, in-place tag editing with autocomplete, and Settings People screen to view hours, rename/merge, and remove tags.
+  - **Export Updates**: Segments CSV/JSON export includes `company`, entries include `on_vacation`, and export card shows Vacation hours for the filtered period.

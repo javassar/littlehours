@@ -68,6 +68,15 @@ export const LogPage: React.FC = () => {
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('Saved');
 
+  // Vacation mode state (read from settings, Milestone 3.7)
+  const [vacationMode, setVacationModeState] = useState<boolean>(Boolean(settings?.vacation_mode));
+
+  useEffect(() => {
+    if (settings?.vacation_mode !== undefined) {
+      setVacationModeState(Boolean(settings.vacation_mode));
+    }
+  }, [settings?.vacation_mode]);
+
   // Confirmation sheet state (Milestone 2.3 & 2.5)
   const [confirmationEntry, setConfirmationEntry] = useState<{
     id: string;
@@ -322,6 +331,7 @@ export const LogPage: React.FC = () => {
       window_end: endToSave.toISOString(),
       parse_status: 'pending' as const,
       follow_ups: [],
+      on_vacation: Boolean(vacationMode),
       created_at: new Date().toISOString(),
     };
 
@@ -416,6 +426,7 @@ export const LogPage: React.FC = () => {
       confirmed: true,
       model: s.model || 'manual',
       prompt_version: s.prompt_version || 'v2',
+      company: Array.isArray(s.company) ? s.company : [],
     }));
 
     // Milestone 2.5: Apply new segments and adjustments in one database transaction via Postgres RPC
@@ -449,6 +460,7 @@ export const LogPage: React.FC = () => {
           category: s.category,
           start_time: s.start_time,
           end_time: s.end_time,
+          company: Array.isArray(s.company) ? s.company : [],
           confirmed: false,
         })
         .eq('id', s.id);
@@ -461,6 +473,13 @@ export const LogPage: React.FC = () => {
   return (
     <div className="page-container screen-fade-in log-page">
       <Toast visible={toastVisible} message={toastMessage} onClose={() => setToastVisible(false)} />
+
+      {/* Vacation mode ribbon (Milestone 3.7) */}
+      {vacationMode && (
+        <div className="vacation-mode-ribbon" role="status" aria-label="Vacation mode is active">
+          ✦ Vacation mode is on
+        </div>
+      )}
 
       {/* Window indicator with pencil icon */}
       <div className="log-window-header">
@@ -497,12 +516,12 @@ export const LogPage: React.FC = () => {
         <textarea
           ref={textareaRef}
           className="time-log-textarea main-log-textarea"
-          placeholder="How did you spend that time?"
+          placeholder="I was reading a fairy tale, then worked on the garden..."
           value={text}
           onChange={handleTextChange}
           disabled={isSaving}
           rows={3}
-          aria-label="How did you spend that time?"
+          aria-label="I was reading a fairy tale, then worked on the garden..."
         />
 
         <div className="log-button-wrap">

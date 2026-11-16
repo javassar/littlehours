@@ -89,7 +89,7 @@ export const DesignPage: React.FC = () => {
           <div className="type-item" style={{ marginTop: 14 }}>
             <span className="type-label">Display 500 Italic (Day heading & prompt)</span>
             <div style={{ fontFamily: 'var(--font-display)', fontStyle: 'italic', fontWeight: 500, fontSize: 24 }}>
-              How did you spend that time?
+              I was reading a fairy tale, then worked on the garden...
             </div>
           </div>
           <div className="type-item" style={{ marginTop: 14 }}>

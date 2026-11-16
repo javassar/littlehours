@@ -44,7 +44,7 @@ export const LoginPage: React.FC = () => {
       <div className="login-header">
         <Swan size={100} />
         <h2 className="login-title">Welcome to Little Hours</h2>
-        <p className="login-subtitle">A quiet record of your days</p>
+        <p className="login-subtitle">A record of your days</p>
       </div>
 
       <Card ornamental={true} className="login-card">

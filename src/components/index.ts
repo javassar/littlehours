@@ -11,6 +11,7 @@ export * from './EntryEditSheet';
 export * from './ConfirmationSheet';
 export * from './FollowUpCard';
 export * from './CategoriesSheet';
+export * from './PeopleSheet';
 export * from './ProtectedRoute';
 export * from './InstallBanner';
 export * from './illustrations';

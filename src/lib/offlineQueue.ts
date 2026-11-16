@@ -12,6 +12,7 @@ export interface QueuedEntry {
   window_end: string;
   parse_status?: 'pending' | 'parsed' | 'needs_clarification' | 'failed';
   follow_ups: any[];
+  on_vacation?: boolean;
   created_at: string;
   queued_at: string;
   isQueued?: boolean;
@@ -157,6 +158,7 @@ export async function syncQueue(onEntrySynced?: (id: string) => void): Promise<{
             window_end: entry.window_end,
             parse_status: entry.parse_status || 'pending',
             follow_ups: entry.follow_ups || [],
+            on_vacation: Boolean(entry.on_vacation),
           },
           { onConflict: 'id' }
         );

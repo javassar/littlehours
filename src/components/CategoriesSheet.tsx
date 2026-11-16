@@ -2,56 +2,83 @@ import React, { useState } from 'react';
 import { Chip } from './Chip';
 import { TrashIcon } from './EntryEditSheet';
 import {
+  CategoryItem,
+  normalizeCategories,
   updateUserCategories,
   renameCategory,
   deleteCategory,
+  updateCategoryDescription,
 } from '../lib/settings';
 import './CategoriesSheet.css';
 
 export interface CategoriesSheetProps {
   isOpen: boolean;
   userId: string;
-  categories: string[];
+  categories: CategoryItem[] | string[];
   onClose: () => void;
-  onCategoriesUpdated: (newCategories: string[]) => void;
+  onCategoriesUpdated: (newCategories: CategoryItem[]) => void;
   onToast: (msg: string) => void;
 }
 
 export const CategoriesSheet: React.FC<CategoriesSheetProps> = ({
   isOpen,
   userId,
-  categories,
+  categories: rawCategories,
   onClose,
   onCategoriesUpdated,
   onToast,
 }) => {
+  const categories = normalizeCategories(rawCategories);
+
+  // New category form inputs
   const [newCatInput, setNewCatInput] = useState('');
-  const [editingCat, setEditingCat] = useState<string | null>(null);
+  const [newCatDescInput, setNewCatDescInput] = useState('');
+
+  // Inline rename name state
+  const [editingNameCat, setEditingNameCat] = useState<string | null>(null);
   const [renameInput, setRenameInput] = useState('');
+
+  // Inline edit description state
+  const [editingDescCat, setEditingDescCat] = useState<string | null>(null);
+  const [descInput, setDescInput] = useState('');
+
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   if (!isOpen) return null;
 
-  // 1. Add new category
+  // 1. Add new category (requires both name and description)
   const handleAddCategory = async (e: React.FormEvent) => {
     e.preventDefault();
-    const clean = newCatInput.trim().toLowerCase();
-    if (!clean) return;
+    const cleanName = newCatInput.trim().toLowerCase();
+    const cleanDesc = newCatDescInput.trim();
 
-    if (categories.some((c) => c.toLowerCase() === clean)) {
-      setAlertMessage(`Category "${clean}" already exists.`);
+    if (!cleanName) {
+      setAlertMessage('Category name cannot be empty.');
+      return;
+    }
+    if (!cleanDesc) {
+      setAlertMessage('A written description is required so the AI knows how to categorize it.');
+      return;
+    }
+
+    if (categories.some((c) => c.name.toLowerCase() === cleanName)) {
+      setAlertMessage(`Category "${cleanName}" already exists.`);
       return;
     }
 
     setBusy(true);
     setAlertMessage(null);
     try {
-      const updated = [...categories, clean];
+      const updated: CategoryItem[] = [
+        ...categories,
+        { name: cleanName, description: cleanDesc },
+      ];
       await updateUserCategories(userId, updated);
       onCategoriesUpdated(updated);
       setNewCatInput('');
-      onToast(`Added category "${clean}"`);
+      setNewCatDescInput('');
+      onToast(`Added category "${cleanName}"`);
     } catch (err: unknown) {
       setAlertMessage(err instanceof Error ? err.message : 'Failed to add category');
     } finally {
@@ -60,9 +87,9 @@ export const CategoriesSheet: React.FC<CategoriesSheetProps> = ({
   };
 
   // 2. Start inline renaming
-  const handleStartRename = (cat: string) => {
-    setEditingCat(cat);
-    setRenameInput(cat);
+  const handleStartRename = (catName: string) => {
+    setEditingNameCat(catName);
+    setRenameInput(catName);
     setAlertMessage(null);
   };
 
@@ -75,11 +102,15 @@ export const CategoriesSheet: React.FC<CategoriesSheetProps> = ({
     }
 
     if (cleanNew === oldName.toLowerCase()) {
-      setEditingCat(null);
+      setEditingNameCat(null);
       return;
     }
 
-    if (categories.some((c) => c.toLowerCase() === cleanNew && c.toLowerCase() !== oldName.toLowerCase())) {
+    if (
+      categories.some(
+        (c) => c.name.toLowerCase() === cleanNew && c.name.toLowerCase() !== oldName.toLowerCase()
+      )
+    ) {
       setAlertMessage(`Category "${cleanNew}" already exists.`);
       return;
     }
@@ -94,7 +125,7 @@ export const CategoriesSheet: React.FC<CategoriesSheetProps> = ({
         categories
       );
       onCategoriesUpdated(newCategories);
-      setEditingCat(null);
+      setEditingNameCat(null);
       onToast(`Renamed to "${cleanNew}" (${updatedCount} segment(s) updated)`);
     } catch (err: unknown) {
       setAlertMessage(err instanceof Error ? err.message : 'Failed to rename category');
@@ -103,22 +134,50 @@ export const CategoriesSheet: React.FC<CategoriesSheetProps> = ({
     }
   };
 
-  // 3. Remove category (blocked if segments use it)
-  const handleRemoveCategory = async (cat: string) => {
+  // 3. Start editing description
+  const handleStartEditDesc = (cat: CategoryItem) => {
+    setEditingDescCat(cat.name);
+    setDescInput(cat.description || '');
+    setAlertMessage(null);
+  };
+
+  // Save description in place
+  const handleSaveDescription = async (catName: string) => {
     setBusy(true);
     setAlertMessage(null);
     try {
-      const res = await deleteCategory(userId, cat, categories);
+      const updated = await updateCategoryDescription(
+        userId,
+        catName,
+        descInput,
+        categories
+      );
+      onCategoriesUpdated(updated);
+      setEditingDescCat(null);
+      onToast(`Description updated for "${catName}"`);
+    } catch (err: unknown) {
+      setAlertMessage(err instanceof Error ? err.message : 'Failed to update description');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // 4. Remove category (blocked if segments use it)
+  const handleRemoveCategory = async (catName: string) => {
+    setBusy(true);
+    setAlertMessage(null);
+    try {
+      const res = await deleteCategory(userId, catName, categories);
       if (!res.success) {
         setAlertMessage(
-          `Cannot remove "${cat}" because ${res.usageCount} segment(s) are currently using it. Reassign or edit those segments first.`
+          `Cannot remove "${catName}" because ${res.usageCount} segment(s) are currently using it. Reassign or edit those segments first.`
         );
         return;
       }
 
       if (res.newCategories) {
         onCategoriesUpdated(res.newCategories);
-        onToast(`Removed category "${cat}"`);
+        onToast(`Removed category "${catName}"`);
       }
     } catch (err: unknown) {
       setAlertMessage(err instanceof Error ? err.message : 'Failed to remove category');
@@ -127,7 +186,7 @@ export const CategoriesSheet: React.FC<CategoriesSheetProps> = ({
     }
   };
 
-  // 4. Reorder categories (move up / down)
+  // 5. Reorder categories (move up / down)
   const handleMove = async (index: number, direction: 'up' | 'down') => {
     const targetIdx = direction === 'up' ? index - 1 : index + 1;
     if (targetIdx < 0 || targetIdx >= categories.length) return;
@@ -177,11 +236,17 @@ export const CategoriesSheet: React.FC<CategoriesSheetProps> = ({
             </svg>
           </button>
           <h2 className="categories-sheet-title">Categories</h2>
-          <p className="categories-sheet-subtitle">Add, rename, reorder, and remove categories</p>
+          <p className="categories-sheet-subtitle">Add, rename, reorder, and edit category descriptions</p>
         </div>
 
         {/* Body */}
         <div className="categories-sheet-body">
+          {/* Note: Re-read all entries to apply changes to old entries */}
+          <div className="categories-note-banner" role="note">
+            <span className="categories-note-bullet">✦</span>
+            <span>Re-read all entries to apply changes to old entries.</span>
+          </div>
+
           {/* Alert Message */}
           {alertMessage && (
             <div className="categories-sheet-alert" role="alert">
@@ -197,130 +262,190 @@ export const CategoriesSheet: React.FC<CategoriesSheetProps> = ({
             </div>
           )}
 
-          {/* Add Category Form */}
-          <form onSubmit={handleAddCategory} className="categories-add-form">
-            <label htmlFor="new-category-input" className="visually-hidden">
-              New category name
-            </label>
+          {/* Add Category Form (requires name and description) */}
+          <form onSubmit={handleAddCategory} className="categories-add-form-expanded">
+            <h4 className="categories-add-heading">Add a new category</h4>
             <input
-              id="new-category-input"
+              id="new-category-name"
               name="new-category-name"
               type="text"
               className="categories-add-input"
-              placeholder="Add a new category..."
+              placeholder="Category name (e.g. pottery)..."
               value={newCatInput}
               onChange={(e) => setNewCatInput(e.target.value)}
+              disabled={busy}
+            />
+            <textarea
+              id="new-category-description"
+              name="new-category-description"
+              className="categories-add-desc-input"
+              placeholder="Description (required for AI parsing: describe what belongs in this category)..."
+              rows={2}
+              value={newCatDescInput}
+              onChange={(e) => setNewCatDescInput(e.target.value)}
               disabled={busy}
             />
             <button
               type="submit"
               className="categories-add-btn"
-              disabled={busy || !newCatInput.trim()}
+              disabled={busy || !newCatInput.trim() || !newCatDescInput.trim()}
             >
-              + Add
+              + Add category
             </button>
           </form>
 
           {/* Categories List */}
           <div className="categories-list" role="list" aria-label="Categories list">
             {categories.map((cat, idx) => {
-              const isEditing = editingCat === cat;
+              const isEditingName = editingNameCat === cat.name;
+              const isEditingDesc = editingDescCat === cat.name;
 
               return (
-                <div key={cat} className="category-row" role="listitem">
-                  {/* Left: Reorder controls + Chip or Inline Rename Input */}
-                  <div className="category-row-left">
-                    <div className="category-order-controls">
-                      <button
-                        type="button"
-                        className="category-order-btn"
-                        onClick={() => handleMove(idx, 'up')}
-                        disabled={idx === 0 || busy}
-                        aria-label={`Move ${cat} up`}
-                        title="Move up"
-                      >
-                        ▲
-                      </button>
-                      <button
-                        type="button"
-                        className="category-order-btn"
-                        onClick={() => handleMove(idx, 'down')}
-                        disabled={idx === categories.length - 1 || busy}
-                        aria-label={`Move ${cat} down`}
-                        title="Move down"
-                      >
-                        ▼
-                      </button>
-                    </div>
-
-                    {isEditing ? (
-                      <div className="category-inline-rename-form">
-                        <label htmlFor={`rename-input-${idx}`} className="visually-hidden">
-                          Rename {cat}
-                        </label>
-                        <input
-                          id={`rename-input-${idx}`}
-                          name={`rename-category-${idx}`}
-                          type="text"
-                          className="category-inline-rename-input"
-                          value={renameInput}
-                          onChange={(e) => setRenameInput(e.target.value)}
-                          autoFocus
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              handleSaveRename(cat);
-                            } else if (e.key === 'Escape') {
-                              setEditingCat(null);
-                            }
-                          }}
-                        />
+                <div key={cat.name} className="category-row-card" role="listitem">
+                  {/* Top row: Reorder controls + Name chip/rename + Action buttons */}
+                  <div className="category-row-top">
+                    <div className="category-row-left">
+                      <div className="category-order-controls">
                         <button
                           type="button"
-                          className="category-inline-save-btn"
-                          onClick={() => handleSaveRename(cat)}
-                          disabled={busy}
+                          className="category-order-btn"
+                          onClick={() => handleMove(idx, 'up')}
+                          disabled={idx === 0 || busy}
+                          aria-label={`Move ${cat.name} up`}
+                          title="Move up"
                         >
-                          Save
+                          ▲
                         </button>
                         <button
                           type="button"
-                          className="category-inline-cancel-btn"
-                          onClick={() => setEditingCat(null)}
+                          className="category-order-btn"
+                          onClick={() => handleMove(idx, 'down')}
+                          disabled={idx === categories.length - 1 || busy}
+                          aria-label={`Move ${cat.name} down`}
+                          title="Move down"
                         >
-                          Cancel
+                          ▼
                         </button>
                       </div>
-                    ) : (
-                      <Chip label={cat} size="md" />
+
+                      {isEditingName ? (
+                        <div className="category-inline-rename-form">
+                          <label htmlFor={`rename-input-${idx}`} className="visually-hidden">
+                            Rename {cat.name}
+                          </label>
+                          <input
+                            id={`rename-input-${idx}`}
+                            name={`rename-category-${idx}`}
+                            type="text"
+                            className="category-inline-rename-input"
+                            value={renameInput}
+                            onChange={(e) => setRenameInput(e.target.value)}
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleSaveRename(cat.name);
+                              } else if (e.key === 'Escape') {
+                                setEditingNameCat(null);
+                              }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className="category-inline-save-btn"
+                            onClick={() => handleSaveRename(cat.name)}
+                            disabled={busy}
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            className="category-inline-cancel-btn"
+                            onClick={() => setEditingNameCat(null)}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <Chip label={cat.name} size="md" />
+                      )}
+                    </div>
+
+                    {!isEditingName && (
+                      <div className="category-row-actions">
+                        <button
+                          type="button"
+                          className="category-rename-btn"
+                          onClick={() => handleStartRename(cat.name)}
+                          disabled={busy}
+                          aria-label={`Rename category ${cat.name}`}
+                          title="Rename"
+                        >
+                          Rename
+                        </button>
+                        <button
+                          type="button"
+                          className="category-remove-btn"
+                          onClick={() => handleRemoveCategory(cat.name)}
+                          disabled={busy}
+                          aria-label={`Remove category ${cat.name}`}
+                          title="Remove category"
+                        >
+                          <TrashIcon size={14} color="var(--danger)" />
+                        </button>
+                      </div>
                     )}
                   </div>
 
-                  {/* Right Actions: Rename & Remove */}
-                  {!isEditing && (
-                    <div className="category-row-actions">
-                      <button
-                        type="button"
-                        className="category-rename-btn"
-                        onClick={() => handleStartRename(cat)}
-                        disabled={busy}
-                        aria-label={`Rename category ${cat}`}
-                        title="Rename"
-                      >
-                        Rename
-                      </button>
-                      <button
-                        type="button"
-                        className="category-remove-btn"
-                        onClick={() => handleRemoveCategory(cat)}
-                        disabled={busy}
-                        aria-label={`Remove category ${cat}`}
-                        title="Remove category"
-                      >
-                        <TrashIcon size={14} color="var(--danger)" />
-                      </button>
-                    </div>
-                  )}
+                  {/* Description row */}
+                  <div className="category-row-desc-section">
+                    {isEditingDesc ? (
+                      <div className="category-desc-edit-form">
+                        <textarea
+                          id={`edit-desc-${idx}`}
+                          className="category-desc-textarea"
+                          value={descInput}
+                          onChange={(e) => setDescInput(e.target.value)}
+                          rows={2}
+                          autoFocus
+                          disabled={busy}
+                        />
+                        <div className="category-desc-edit-actions">
+                          <button
+                            type="button"
+                            className="category-inline-save-btn"
+                            onClick={() => handleSaveDescription(cat.name)}
+                            disabled={busy || !descInput.trim()}
+                          >
+                            Save description
+                          </button>
+                          <button
+                            type="button"
+                            className="category-inline-cancel-btn"
+                            onClick={() => setEditingDescCat(null)}
+                            disabled={busy}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="category-desc-display">
+                        <p className="category-desc-text">
+                          {cat.description || <span className="category-desc-empty">No description set</span>}
+                        </p>
+                        <button
+                          type="button"
+                          className="category-desc-edit-btn"
+                          onClick={() => handleStartEditDesc(cat)}
+                          title="Edit description"
+                          aria-label={`Edit description for ${cat.name}`}
+                        >
+                          Edit
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })}

@@ -12,6 +12,7 @@ import {
   computeOverlapAdjustments,
   OverlapAdjustmentsPayload,
 } from '../lib/overlap';
+import { CategoryItem } from '../lib/settings';
 import './ConfirmationSheet.css';
 
 export interface ConfirmationSheetProps {
@@ -19,7 +20,7 @@ export interface ConfirmationSheetProps {
   entryId: string;
   rawText?: string;
   initialSegments: SegmentItem[];
-  categories: string[];
+  categories: CategoryItem[] | string[];
   timeZone?: string;
   existingSegments?: SegmentItem[];
   onClose: () => void;
@@ -28,6 +29,7 @@ export interface ConfirmationSheetProps {
     overlapPayload?: OverlapAdjustmentsPayload
   ) => Promise<void>;
   onSaveUnconfirmed?: (segments: SegmentItem[]) => Promise<void>;
+  onEditEntry?: () => void;
 }
 
 export const ConfirmationSheet: React.FC<ConfirmationSheetProps> = ({
@@ -41,9 +43,30 @@ export const ConfirmationSheet: React.FC<ConfirmationSheetProps> = ({
   onClose,
   onConfirm,
   onSaveUnconfirmed,
+  onEditEntry,
 }) => {
   const [segments, setSegments] = useState<SegmentItem[]>([]);
+  const [companyInputs, setCompanyInputs] = useState<Record<number, string>>({});
   const [isSaving, setIsSaving] = useState(false);
+
+  const categoryNames = useMemo(() => {
+    return categories.map((c) => (typeof c === 'string' ? c : c.name));
+  }, [categories]);
+
+  const companySuggestions = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of existingSegments) {
+      if (Array.isArray(s.company)) {
+        s.company.forEach((n) => n && set.add(n.trim()));
+      }
+    }
+    for (const s of initialSegments) {
+      if (Array.isArray(s.company)) {
+        s.company.forEach((n) => n && set.add(n.trim()));
+      }
+    }
+    return Array.from(set);
+  }, [existingSegments, initialSegments]);
 
   useEffect(() => {
     if (isOpen) {
@@ -92,6 +115,59 @@ export const ConfirmationSheet: React.FC<ConfirmationSheetProps> = ({
     setSegments((prev) => {
       const copy = [...prev];
       copy[index] = { ...copy[index], category: newCategory };
+      return copy;
+    });
+  };
+
+  // 2b. Add / Remove Company (Milestone 3.7)
+  const handleAddCompany = (segIdx: number, name: string) => {
+    const clean = name.trim();
+    if (!clean) return;
+    setSegments((prev) => {
+      const copy = [...prev];
+      const curComp = Array.isArray(copy[segIdx].company) ? [...copy[segIdx].company!] : [];
+      if (!curComp.some((n) => n.toLowerCase() === clean.toLowerCase())) {
+        curComp.push(clean);
+        copy[segIdx] = { ...copy[segIdx], company: curComp };
+      }
+      return copy;
+    });
+  };
+
+  const handleCompanyInputChange = (segIdx: number, val: string) => {
+    if (val.includes(',')) {
+      const parts = val.split(',');
+      const toAdd = parts[0].trim();
+      const rest = parts.slice(1).join(',');
+      if (toAdd) {
+        handleAddCompany(segIdx, toAdd);
+      }
+      setCompanyInputs((prev) => ({ ...prev, [segIdx]: rest }));
+      return;
+    }
+    setCompanyInputs((prev) => ({ ...prev, [segIdx]: val }));
+  };
+
+  const handleCompanyInputKeyDown = (
+    segIdx: number,
+    e: React.KeyboardEvent<HTMLInputElement>
+  ) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const val = (companyInputs[segIdx] || '').trim();
+      if (val) {
+        handleAddCompany(segIdx, val);
+        setCompanyInputs((prev) => ({ ...prev, [segIdx]: '' }));
+      }
+    }
+  };
+
+  const handleRemoveCompany = (segIdx: number, personIdx: number) => {
+    setSegments((prev) => {
+      const copy = [...prev];
+      const curComp = Array.isArray(copy[segIdx].company) ? [...copy[segIdx].company!] : [];
+      curComp.splice(personIdx, 1);
+      copy[segIdx] = { ...copy[segIdx], company: curComp };
       return copy;
     });
   };
@@ -184,7 +260,7 @@ export const ConfirmationSheet: React.FC<ConfirmationSheetProps> = ({
         start_time: midIso,
         end_time: seg.end_time,
         activity_label: '',
-        category: categories[0] || 'work',
+        category: (typeof categories[0] === 'object' ? categories[0].name : categories[0]) || 'work',
         confirmed: false,
       };
 
@@ -368,7 +444,7 @@ export const ConfirmationSheet: React.FC<ConfirmationSheetProps> = ({
                     />
                   </div>
 
-                  {/* Category Picker Row */}
+                  {/* Category Picker Row & Company Chips */}
                   <div className="confirmation-category-row">
                     <Chip label={seg.category} size="sm" />
                     <select
@@ -379,12 +455,58 @@ export const ConfirmationSheet: React.FC<ConfirmationSheetProps> = ({
                       onChange={(e) => handleCategoryChange(idx, e.target.value)}
                       aria-label={`Select category for ${seg.activity_label}`}
                     >
-                      {categories.map((cat) => (
+                      {categoryNames.map((cat) => (
                         <option key={cat} value={cat}>
                           {cat}
                         </option>
                       ))}
                     </select>
+
+                    {/* Company chips on the segment */}
+                    {Array.isArray(seg.company) && seg.company.length > 0 && (
+                      <div className="confirmation-company-chips">
+                        {seg.company.map((person, pIdx) => (
+                          <span key={person} className="company-chip">
+                            <span>{person}</span>
+                            <button
+                              type="button"
+                              className="company-chip-remove"
+                              onClick={() => handleRemoveCompany(idx, pIdx)}
+                              aria-label={`Remove ${person}`}
+                              title="Remove person"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Edit company for this segment (Milestone 3.7) */}
+                  <div className="confirmation-company-field">
+                    <label className="confirmation-field-label" htmlFor={`seg-company-${idx}`}>
+                      With (people)
+                    </label>
+                    <div className="confirmation-company-input-wrap">
+                      <input
+                        id={`seg-company-${idx}`}
+                        type="text"
+                        className="confirmation-company-input"
+                        placeholder="Add person (press Enter or comma)..."
+                        value={companyInputs[idx] || ''}
+                        onChange={(e) => handleCompanyInputChange(idx, e.target.value)}
+                        onKeyDown={(e) => handleCompanyInputKeyDown(idx, e)}
+                        list={`company-suggestions-${idx}`}
+                      />
+                      {companySuggestions.length > 0 && (
+                        <datalist id={`company-suggestions-${idx}`}>
+                          {companySuggestions.map((name) => (
+                            <option key={name} value={name} />
+                          ))}
+                        </datalist>
+                      )}
+                    </div>
                   </div>
 
                   {/* Row actions: Split row / Merge with next */}
@@ -455,6 +577,16 @@ export const ConfirmationSheet: React.FC<ConfirmationSheetProps> = ({
           >
             Keep unchecked for now
           </Button>
+          {onEditEntry && (
+            <button
+              type="button"
+              className="window-reset-link"
+              onClick={onEditEntry}
+              style={{ margin: '6px auto 0 auto', display: 'block', fontSize: 13, background: 'none', border: 'none', color: 'var(--mauve)', textDecoration: 'underline', cursor: 'pointer' }}
+            >
+              Edit original entry text or window
+            </button>
+          )}
         </div>
       </div>
     </div>

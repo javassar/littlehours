@@ -13,6 +13,7 @@ export interface SegmentItem {
   confirmed: boolean;
   model?: string;
   prompt_version?: string;
+  company?: string[];
 }
 
 export interface FollowUpItem {
@@ -30,6 +31,7 @@ export interface EntryItem {
   clarification_question?: string | null;
   follow_ups?: FollowUpItem[];
   segments?: SegmentItem[];
+  on_vacation?: boolean;
   created_at: string;
 }
 
@@ -60,7 +62,15 @@ export interface EntryEditSheetProps {
   entry: EntryItem | null;
   isOpen: boolean;
   onClose: () => void;
-  onSave: (id: string, updated: { raw_text: string; window_start: string; window_end: string }) => Promise<void>;
+  onSave: (
+    id: string,
+    updated: {
+      raw_text: string;
+      window_start: string;
+      window_end: string;
+      on_vacation?: boolean;
+    }
+  ) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 }
 
@@ -74,6 +84,7 @@ export const EntryEditSheet: React.FC<EntryEditSheetProps> = ({
   const [text, setText] = useState('');
   const [startVal, setStartVal] = useState('');
   const [endVal, setEndVal] = useState('');
+  const [onVacation, setOnVacation] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Confirmation states
@@ -89,6 +100,7 @@ export const EntryEditSheet: React.FC<EntryEditSheetProps> = ({
       setText(entry.raw_text);
       setStartVal(toDateTimeLocalValue(new Date(entry.window_start)));
       setEndVal(toDateTimeLocalValue(new Date(entry.window_end)));
+      setOnVacation(Boolean(entry.on_vacation));
       setError(null);
       setShowDeleteConfirm(false);
       setNeedsLongWindowConfirm(false);
@@ -147,6 +159,7 @@ export const EntryEditSheet: React.FC<EntryEditSheetProps> = ({
         raw_text: text.trim(),
         window_start: s.toISOString(),
         window_end: e.toISOString(),
+        on_vacation: onVacation,
       });
       onClose();
     } catch (err: unknown) {
@@ -316,6 +329,43 @@ export const EntryEditSheet: React.FC<EntryEditSheetProps> = ({
                 max={toDateTimeLocalValue(new Date())}
                 required
                 disabled={saving}
+              />
+            </div>
+
+            {/* On vacation switch (Milestone 3.7) */}
+            <div
+              className="sheet-field"
+              style={{
+                marginTop: 14,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '8px 12px',
+                background: 'var(--surface-sunk)',
+                borderRadius: 'var(--radius-input)',
+              }}
+            >
+              <div>
+                <label
+                  className="sheet-label"
+                  htmlFor="entry-edit-vacation"
+                  style={{ marginBottom: 2, cursor: 'pointer', display: 'block' }}
+                >
+                  On vacation
+                </label>
+                <span style={{ fontSize: 12, color: 'var(--mauve)', display: 'block' }}>
+                  Marks entry as vacation time and re-evaluates segments
+                </span>
+              </div>
+              <input
+                id="entry-edit-vacation"
+                name="on_vacation"
+                type="checkbox"
+                className="reminders-switch-input"
+                checked={onVacation}
+                onChange={(e) => setOnVacation(e.target.checked)}
+                disabled={saving}
+                aria-label="On vacation"
               />
             </div>
 
