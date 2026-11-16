@@ -505,6 +505,23 @@ export const HistoryPage: React.FC = () => {
     return list;
   }, [entries]);
 
+  // Milestone 3.7: Combine queued ratings and server ratings
+  const allRatings = useMemo(() => {
+    return [
+      ...queuedRatings.map((r) => ({ ...r, isQueued: true })),
+      ...ratings,
+    ];
+  }, [queuedRatings, ratings]);
+
+  const standaloneRatings = useMemo(() => {
+    const allEntryIds = new Set([
+      ...entries.map((e) => e.id),
+      ...queuedEntries.map((e) => e.id),
+    ]);
+    return allRatings.filter((r) => !r.entry_id || !allEntryIds.has(r.entry_id));
+  }, [allRatings, entries, queuedEntries]);
+
+
   const handleConfirmSegments = async (
     updatedSegments: SegmentItem[],
     overlapPayload?: OverlapAdjustmentsPayload
@@ -660,21 +677,6 @@ export const HistoryPage: React.FC = () => {
     );
   }
 
-  // Milestone 3.7: Combine queued ratings and server ratings
-  const allRatings = useMemo(() => {
-    return [
-      ...queuedRatings.map((r) => ({ ...r, isQueued: true })),
-      ...ratings,
-    ];
-  }, [queuedRatings, ratings]);
-
-  const standaloneRatings = useMemo(() => {
-    const allEntryIds = new Set([
-      ...entries.map((e) => e.id),
-      ...queuedEntries.map((e) => e.id),
-    ]);
-    return allRatings.filter((r) => !r.entry_id || !allEntryIds.has(r.entry_id));
-  }, [allRatings, entries, queuedEntries]);
 
   // Empty state with Deer illustration (only if neither entries nor ratings exist)
   if (entries.length === 0 && queuedEntries.length === 0 && allRatings.length === 0) {
