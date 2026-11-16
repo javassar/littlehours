@@ -633,6 +633,9 @@ export const LogPage: React.FC = () => {
 
       {/* Main text box inside ornamental card */}
       <Card ornamental={true} className="log-input-card">
+        <h2 id="prompt-label" className="prompt-label">
+          How did you spend your time?
+        </h2>
         <textarea
           ref={textareaRef}
           className="time-log-textarea main-log-textarea"
@@ -641,7 +644,7 @@ export const LogPage: React.FC = () => {
           onChange={handleTextChange}
           disabled={isSaving}
           rows={3}
-          aria-label="I was reading a fairy tale, then worked on the garden..."
+          aria-label="How did you spend your time?"
         />
 
         {/* Milestone 3.7: PainRating directly below textarea and above Save button */}
