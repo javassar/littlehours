@@ -17,7 +17,8 @@ begin
     url := project_url || '/functions/v1/send-reminders',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'apikey', anon_key
+      'apikey', anon_key,
+      'Authorization', 'Bearer ' || anon_key
     ),
     body := '{}'::jsonb
   );

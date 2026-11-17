@@ -21,6 +21,7 @@
 .confirmation-sheet-surface {
   width: 100%;
   max-width: 480px;
+  min-width: 0;
   max-height: calc(100dvh - 88px - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px));
   background-color: var(--surface);
   border-radius: 24px;
@@ -94,10 +95,13 @@
 .confirmation-sheet-body {
   padding: 16px 20px;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   display: flex;
   flex-direction: column;
   gap: 12px;
   flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 /* Raw text quote */
@@ -230,6 +234,7 @@
 }
 
 .confirmation-time-input {
+  display: block;
   font-family: var(--font-body);
   font-size: 13px;
   color: var(--ink);
@@ -238,7 +243,19 @@
   border-radius: 10px;
   padding: 4px 6px;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   box-sizing: border-box;
+  -webkit-appearance: none;
+  appearance: none;
+  text-align: left;
+}
+
+.confirmation-time-input::-webkit-date-and-time-value {
+  text-align: left;
+  margin: 0;
+  padding: 0;
+  min-height: 1.2em;
 }
 
 .confirmation-time-input:focus {
@@ -373,6 +390,7 @@
 }
 
 .confirmation-boundary-input {
+  display: inline-block;
   font-family: var(--font-body);
   font-size: 13px;
   color: var(--ink);
@@ -381,6 +399,18 @@
   padding: 0;
   cursor: pointer;
   accent-color: var(--rose-deep);
+  min-width: 0;
+  max-width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  text-align: left;
+}
+
+.confirmation-boundary-input::-webkit-date-and-time-value {
+  text-align: left;
+  margin: 0;
+  padding: 0;
+  min-height: 1.2em;
 }
 
 .confirmation-boundary-input:focus {
@@ -390,12 +420,14 @@
 
 /* Footer Actions */
 .confirmation-sheet-footer {
-  padding: 12px 20px 16px 20px;
+  padding: 12px 20px calc(16px + env(safe-area-inset-bottom, 0px)) 20px;
   border-top: 1px solid rgba(184, 114, 127, 0.15);
   display: flex;
   flex-direction: column;
   gap: 8px;
   flex-shrink: 0;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 /* Company chips & input (Milestone 3.7) */

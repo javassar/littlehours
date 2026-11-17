@@ -7,6 +7,33 @@
   padding: 0;
 }
 
+html, body {
+  box-sizing: border-box;
+}
+
+/* Date and time input reset for iOS Safari */
+input[type="datetime-local"],
+input[type="date"],
+input[type="time"] {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  box-sizing: border-box;
+}
+
+/* Ensure text inside iOS Safari date/time fields is cleanly aligned and not off-center */
+input[type="datetime-local"]::-webkit-date-and-time-value,
+input[type="date"]::-webkit-date-and-time-value,
+input[type="time"]::-webkit-date-and-time-value {
+  text-align: left;
+  margin: 0;
+  padding: 0;
+  min-height: 1.2em;
+}
+
 html {
   font-size: var(--text-body-size);
   color: var(--ink);

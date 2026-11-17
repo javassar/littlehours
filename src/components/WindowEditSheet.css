@@ -21,6 +21,7 @@
 .sheet-surface {
   width: 100%;
   max-width: 480px;
+  min-width: 0;
   max-height: calc(100dvh - 88px - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px));
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -28,8 +29,14 @@
   border-radius: 24px;
   box-shadow: 0 4px 30px rgba(75, 51, 64, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.8);
   border: 1px solid rgba(184, 114, 127, 0.25);
-  padding: 16px 20px 20px 20px;
+  padding: 16px 20px calc(28px + env(safe-area-inset-bottom, 0px)) 20px;
   animation: sheetSlideUp var(--transition-base) forwards;
+  box-sizing: border-box;
+}
+
+.sheet-surface form {
+  width: 100%;
+  min-width: 0;
   box-sizing: border-box;
 }
 
@@ -69,6 +76,9 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .sheet-label {
@@ -79,7 +89,12 @@
 }
 
 .sheet-datetime-input {
+  display: block;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  -webkit-appearance: none;
+  appearance: none;
   background-color: var(--surface-sunk);
   box-shadow: var(--shadow-input-sunk);
   border: 1px solid rgba(184, 114, 127, 0.25);
@@ -89,8 +104,16 @@
   font-size: 16px; /* >= 16px prevents iOS zoom */
   color: var(--ink);
   box-sizing: border-box;
+  text-align: left;
   accent-color: var(--rose-deep);
   outline: none;
+}
+
+.sheet-datetime-input::-webkit-date-and-time-value {
+  text-align: left;
+  margin: 0;
+  padding: 0;
+  min-height: 1.2em;
 }
 
 .sheet-inline-link {
@@ -109,10 +132,14 @@
   display: flex;
   gap: 12px;
   margin-top: 24px;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .sheet-actions > * {
   flex: 1;
+  min-width: 0;
 }
 
 .sheet-error {
@@ -124,6 +151,8 @@
   font-size: 14px;
   line-height: 1.45;
   margin-bottom: 16px;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .sheet-confirm-box {
@@ -132,6 +161,8 @@
   border-radius: 16px;
   padding: 16px;
   margin-top: 10px;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .sheet-confirm-text {
@@ -145,10 +176,14 @@
 .sheet-button-row {
   display: flex;
   gap: 12px;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .sheet-button-row > * {
   flex: 1;
+  min-width: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {

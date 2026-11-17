@@ -365,9 +365,11 @@ export const EntryEditSheet: React.FC<EntryEditSheetProps> = ({
                 padding: '8px 12px',
                 background: 'var(--surface-sunk)',
                 borderRadius: 'var(--radius-input)',
+                minWidth: 0,
+                boxSizing: 'border-box',
               }}
             >
-              <div>
+              <div style={{ minWidth: 0, flex: 1, marginRight: 12 }}>
                 <label
                   className="sheet-label"
                   htmlFor="entry-edit-vacation"
@@ -399,6 +401,9 @@ export const EntryEditSheet: React.FC<EntryEditSheetProps> = ({
                   marginTop: 14,
                   paddingTop: 12,
                   borderTop: '1px solid rgba(184, 114, 127, 0.2)',
+                  minWidth: 0,
+                  width: '100%',
+                  boxSizing: 'border-box',
                 }}
               >
                 <PainRating

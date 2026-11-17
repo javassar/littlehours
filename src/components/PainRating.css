@@ -3,6 +3,9 @@
   flex-direction: column;
   align-items: center;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   margin: 12px 0 6px 0;
 }
 
@@ -15,6 +18,8 @@
   position: relative;
   width: 100%;
   max-width: 320px;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .pain-rating-label {
@@ -54,8 +59,10 @@
   justify-content: space-between;
   width: 100%;
   max-width: 320px;
+  min-width: 0;
   gap: 8px;
   outline: none;
+  box-sizing: border-box;
 }
 
 .pain-rating-buttons:focus-visible {
