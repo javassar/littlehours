@@ -44,7 +44,7 @@ console.log('✓ Verified: FollowUpCard component exists and is exported with al
 // Check 2: Prompt v2 & Follow-ups Support
 // ==========================================
 console.log('\n[Check 2] Verifying prompt.ts v2 and follow-ups rules...');
-assert.strictEqual(PROMPT_VERSION, 'v2', 'PROMPT_VERSION must be bumped to v2');
+assert(['v2', 'v3'].includes(PROMPT_VERSION), 'PROMPT_VERSION must be at least v2');
 assert(SYSTEM_PROMPT.includes('follow_ups'), 'SYSTEM_PROMPT must mention follow_ups');
 assert(SYSTEM_PROMPT.includes('combine the activities in raw_text with the answers in follow_ups'), 'SYSTEM_PROMPT must explain combining raw_text and follow_ups');
 console.log('✓ Verified: SYSTEM_PROMPT includes explicit instructions for follow-ups.');

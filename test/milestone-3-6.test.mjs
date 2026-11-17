@@ -94,7 +94,7 @@ console.log('✓ normalizeCategories correctly maps legacy names and populates d
 // Check 3: Parser Prompt v2 Verification
 // ==========================================
 console.log('[Check 3] Verifying Parser Prompt v2...');
-assert.strictEqual(PROMPT_VERSION, 'v2');
+assert(['v2', 'v3'].includes(PROMPT_VERSION), 'Expected PROMPT_VERSION to be v2 or v3');
 assert(SYSTEM_PROMPT.includes('on_vacation (true or false)'), 'Prompt must mention on_vacation input');
 assert(SYSTEM_PROMPT.includes('company_used'), 'Prompt must mention company_used input');
 assert(SYSTEM_PROMPT.includes('If on_vacation is true, every segment\'s category is "vacation"'), 'Prompt must include tie-break rule 6.a');

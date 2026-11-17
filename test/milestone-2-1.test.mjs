@@ -327,6 +327,107 @@ const testCases = [
       assert(res.status === 'needs_clarification' || res.status === 'parsed');
     },
   },
+  // Part B: Single-activity parser test cases (Arizona timezone -07:00)
+  {
+    id: 7,
+    text: 'doomscrolled in bed on tiktok',
+    start: '2026-11-09T14:00:00-07:00', // 2:00 PM
+    end: '2026-11-09T15:00:00-07:00',   // 3:00 PM
+    mockExpected: {
+      status: 'parsed',
+      segments: [
+        {
+          start_time: '2026-11-09T14:00:00-07:00',
+          end_time: '2026-11-09T15:00:00-07:00',
+          activity_label: 'doomscrolling in bed',
+          category: 'phone and social media',
+        },
+      ],
+    },
+    verify: (res) => {
+      assert.strictEqual(res.status, 'parsed');
+      assert.strictEqual(res.segments.length, 1);
+      assert.strictEqual(res.segments[0].start_time, '2026-11-09T14:00:00-07:00');
+      assert.strictEqual(res.segments[0].end_time, '2026-11-09T15:00:00-07:00');
+      assert.strictEqual(res.question, undefined);
+    },
+  },
+  {
+    id: 8,
+    text: 'doomscrolled for whole time period because i was putting off working',
+    start: '2026-11-09T13:31:00-07:00', // 1:31 PM
+    end: '2026-11-09T15:00:00-07:00',   // 3:00 PM
+    mockExpected: {
+      status: 'parsed',
+      segments: [
+        {
+          start_time: '2026-11-09T13:31:00-07:00',
+          end_time: '2026-11-09T15:00:00-07:00',
+          activity_label: 'doomscrolling',
+          category: 'phone and social media',
+        },
+      ],
+    },
+    verify: (res) => {
+      assert.strictEqual(res.status, 'parsed');
+      assert.strictEqual(res.segments.length, 1);
+      assert.strictEqual(res.segments[0].start_time, '2026-11-09T13:31:00-07:00');
+      assert.strictEqual(res.segments[0].end_time, '2026-11-09T15:00:00-07:00');
+      assert.strictEqual(res.question, undefined);
+    },
+  },
+  {
+    id: 9,
+    text: 'worked on my resume',
+    start: '2026-11-09T14:00:00-07:00', // 2:00 PM
+    end: '2026-11-09T17:00:00-07:00',   // 5:00 PM
+    mockExpected: {
+      status: 'parsed',
+      segments: [
+        {
+          start_time: '2026-11-09T14:00:00-07:00',
+          end_time: '2026-11-09T17:00:00-07:00',
+          activity_label: 'resume editing',
+          category: 'job search',
+        },
+      ],
+    },
+    verify: (res) => {
+      assert.strictEqual(res.status, 'parsed');
+      assert.strictEqual(res.segments.length, 1);
+      assert.strictEqual(res.segments[0].start_time, '2026-11-09T14:00:00-07:00');
+      assert.strictEqual(res.segments[0].end_time, '2026-11-09T17:00:00-07:00');
+      assert.strictEqual(res.question, undefined);
+    },
+  },
+  {
+    id: 10,
+    text: '30 minutes scrolling',
+    start: '2026-11-09T14:00:00-07:00', // 2:00 PM
+    end: '2026-11-09T17:00:00-07:00',   // 5:00 PM
+    mockExpected: {
+      status: 'needs_clarification',
+      question: 'This covers 30m of your 3h window. What happened in the remaining 2h 30m?',
+    },
+    verify: (res) => {
+      assert.strictEqual(res.status, 'needs_clarification');
+      assert(res.question.includes('2h 30m') || res.question.includes('remaining'));
+    },
+  },
+  {
+    id: 11,
+    text: 'doomscrolled and worked',
+    start: '2026-11-09T14:00:00-07:00', // 2:00 PM
+    end: '2026-11-09T15:00:00-07:00',   // 3:00 PM
+    mockExpected: {
+      status: 'needs_clarification',
+      question: 'How did you split the hour between doomscrolling and working?',
+    },
+    verify: (res) => {
+      assert.strictEqual(res.status, 'needs_clarification');
+      assert(res.question.length > 0);
+    },
+  },
 ];
 
 for (const tc of testCases) {
