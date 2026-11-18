@@ -56,21 +56,43 @@ async function runTests() {
 
   const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  // Setup: Create a temporary anonymous test user
-  console.log('Creating test anonymous user...');
-  const { data: authData, error: authErr } = await anonClient.auth.signInAnonymously({
-    options: { captchaToken: CLOUDFLARE_TEST_TOKEN },
-  });
+  let testUser: any = null;
+  let testToken = process.env.ANON_USER_TOKEN || process.env.TEST_ANON_TOKEN || '';
 
-  if (authErr || !authData.session || !authData.user) {
-    console.error('Failed to create anonymous test user:', authErr?.message || 'Unknown error');
-    console.error('Note: Ensure Anonymous Sign-ins and Turnstile CAPTCHA are enabled in Supabase dashboard.\n');
-    return;
+  if (testToken) {
+    console.log('Using provided ANON_USER_TOKEN for test execution...');
+    const authed = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: `Bearer ${testToken}` } },
+    });
+    const { data: uData, error: uErr } = await authed.auth.getUser();
+    if (uErr || !uData.user) {
+      console.error('Provided token is invalid or expired:', uErr?.message);
+      return;
+    }
+    testUser = uData.user;
+  } else {
+    // Setup: Create a temporary anonymous test user
+    console.log('Creating test anonymous user via signInAnonymously...');
+    const { data: authData, error: authErr } = await anonClient.auth.signInAnonymously({
+      options: { captchaToken: CLOUDFLARE_TEST_TOKEN },
+    });
+
+    if (authErr || !authData.session || !authData.user) {
+      console.error('Failed to create anonymous test user:', authErr?.message || 'Unknown error');
+      console.error('\nNOTE: If your Supabase dashboard has a live production Turnstile secret key set,');
+      console.error('Cloudflare blocks dummy test tokens. You can run this test suite either by:');
+      console.error('  1. Passing an active anonymous token from your browser session:');
+      console.error('     ANON_USER_TOKEN="<token>" npx tsx scripts/test-demo.ts');
+      console.error('  2. OR temporarily setting Turnstile test secret key in Supabase:');
+      console.error('     1x0000000000000000000000000000000AA\n');
+      return;
+    }
+
+    testUser = authData.user;
+    testToken = authData.session.access_token;
   }
 
-  const testUser = authData.user;
-  const testToken = authData.session.access_token;
-  console.log(`Created test anonymous user: ${testUser.id}\n`);
+  console.log(`Using test anonymous user: ${testUser.id} (is_anonymous: ${testUser.is_anonymous})\n`);
 
   const authedAnon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     global: { headers: { Authorization: `Bearer ${testToken}` } },
