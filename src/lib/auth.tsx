@@ -8,7 +8,8 @@ interface AuthContextType {
   user: User | null;
   settings: UserSettings | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signIn: (email: string, password: string, captchaToken?: string) => Promise<{ error: string | null }>;
+  signInAnonymously: (captchaToken?: string) => Promise<{ error: string | null; user?: User | null }>;
   signOut: () => Promise<void>;
   refreshSettings: () => Promise<void>;
   isConfigured: boolean;
@@ -29,7 +30,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     // 1. Get initial session
-    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+    supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
+      if (initialSession?.user?.is_anonymous) {
+        // Milestone 3.9 Step 4 item 6: Check if anonymous user was deleted by cleanup job
+        const { error: userErr } = await supabase.auth.getUser();
+        if (userErr) {
+          console.warn('[auth] Anonymous session ended or user was deleted:', userErr.message);
+          await supabase.auth.signOut();
+          sessionStorage.setItem('demo_session_ended', 'true');
+          setSession(null);
+          setUser(null);
+          setSettings(null);
+          setLoading(false);
+          return;
+        }
+      }
+
       setSession(initialSession);
       setUser(initialSession?.user ?? null);
       if (initialSession?.user) {
@@ -60,7 +76,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const signIn = async (email: string, password: string): Promise<{ error: string | null }> => {
+  const signIn = async (
+    email: string,
+    password: string,
+    captchaToken?: string
+  ): Promise<{ error: string | null }> => {
     if (!isSupabaseConfigured) {
       return {
         error: 'Supabase credentials are missing. Please configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.local.',
@@ -71,6 +91,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
+        options: captchaToken ? { captchaToken } : undefined,
       });
 
       if (error) {
@@ -105,6 +126,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const signInAnonymously = async (
+    captchaToken?: string
+  ): Promise<{ error: string | null; user?: User | null }> => {
+    if (!isSupabaseConfigured) {
+      return {
+        error: 'Supabase credentials are missing.',
+      };
+    }
+
+    try {
+      const { data, error } = await supabase.auth.signInAnonymously({
+        options: captchaToken ? { captchaToken } : undefined,
+      });
+
+      if (error) {
+        return { error: error.message };
+      }
+
+      setSession(data.session);
+      setUser(data.user);
+      return { error: null, user: data.user };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown connection error';
+      return { error: message };
+    }
+  };
+
   const refreshSettings = async () => {
     if (user) {
       const userSettings = await ensureUserSettings(user.id);
@@ -133,6 +181,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         settings,
         loading,
         signIn,
+        signInAnonymously,
         signOut,
         refreshSettings,
         isConfigured: isSupabaseConfigured,

@@ -226,11 +226,15 @@ export const HistoryPage: React.FC = () => {
 
   // Poll for background AI parsing updates whenever any entry has parse_status === 'pending'
   useEffect(() => {
-    const hasPending = entries.some((e) => e.parse_status === 'pending');
+    const hasPending = entries.some(
+      (e) => e.parse_status === 'pending' && e.clarification_question !== 'demo_limit'
+    );
     if (!hasPending || !user) return;
 
     const timer = setInterval(async () => {
-      const pendingIds = entries.filter((e) => e.parse_status === 'pending').map((e) => e.id);
+      const pendingIds = entries
+        .filter((e) => e.parse_status === 'pending' && e.clarification_question !== 'demo_limit')
+        .map((e) => e.id);
       if (pendingIds.length === 0) return;
 
       const { data, error } = await supabase
@@ -1072,12 +1076,26 @@ export const HistoryPage: React.FC = () => {
 
                     <p className="history-card-text">{entry.raw_text}</p>
 
-                    {/* 1. Pending parsing state: rotating sparkle + "Reading your entry" */}
+                    {/* 1. Pending parsing state: rotating sparkle + "Reading your entry" (or demo limit reached) */}
                     {entry.parse_status === 'pending' && (
-                      <div className="history-card-parsing" aria-label="Reading your entry">
-                        <RotatingSparkle size={15} color="var(--mauve)" />
-                        <span className="history-parsing-text">Reading your entry</span>
-                      </div>
+                      entry.clarification_question === 'demo_limit' ? (
+                        <div
+                          className="history-card-demo-limit"
+                          style={{
+                            fontStyle: 'italic',
+                            color: 'var(--mauve)',
+                            fontSize: 13,
+                            marginTop: 4,
+                          }}
+                        >
+                          Not read: demo limit reached.
+                        </div>
+                      ) : (
+                        <div className="history-card-parsing" aria-label="Reading your entry">
+                          <RotatingSparkle size={15} color="var(--mauve)" />
+                          <span className="history-parsing-text">Reading your entry</span>
+                        </div>
+                      )
                     )}
 
                     {/* 2. Failed parsing state: "I couldn't read that one" + Try again button */}

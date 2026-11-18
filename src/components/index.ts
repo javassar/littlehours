@@ -17,5 +17,7 @@ export * from './PainGuideSheet';
 export * from './RatingEditSheet';
 export * from './ProtectedRoute';
 export * from './InstallBanner';
+export * from './DemoBanner';
+export * from './TurnstileWidget';
 export * from './ModalPortal';
 export * from './illustrations';

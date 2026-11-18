@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { EntryItem } from './EntryEditSheet';
 import { Sparkle } from './illustrations/Sparkle';
+import { useAuth } from '../lib/auth';
+import { DEMO_MAX_FOLLOWUP_CHARS } from '../lib/demoConfig';
 import './FollowUpCard.css';
 
 export interface FollowUpCardProps {
@@ -16,6 +18,8 @@ export const FollowUpCard: React.FC<FollowUpCardProps> = ({
   onFixByHand,
   isSubmitting = false,
 }) => {
+  const { user } = useAuth();
+  const isAnonymous = Boolean(user?.is_anonymous);
   const [answer, setAnswer] = useState('');
   const [localSubmitting, setLocalSubmitting] = useState(false);
 
@@ -104,7 +108,14 @@ export const FollowUpCard: React.FC<FollowUpCardProps> = ({
             rows={2}
             placeholder="Tell me what you did during the rest of the time..."
             value={answer}
-            onChange={(e) => setAnswer(e.target.value)}
+            onChange={(e) => {
+              let val = e.target.value;
+              if (isAnonymous && val.length > DEMO_MAX_FOLLOWUP_CHARS) {
+                val = val.slice(0, DEMO_MAX_FOLLOWUP_CHARS);
+              }
+              setAnswer(val);
+            }}
+            maxLength={isAnonymous ? DEMO_MAX_FOLLOWUP_CHARS : undefined}
             disabled={busy}
             autoCapitalize="sentences"
             autoCorrect="on"
@@ -116,6 +127,20 @@ export const FollowUpCard: React.FC<FollowUpCardProps> = ({
               }
             }}
           />
+
+          {isAnonymous && (
+            <div
+              style={{
+                fontSize: 11,
+                color: 'var(--mauve)',
+                textAlign: 'right',
+                marginTop: -4,
+                marginBottom: 6,
+              }}
+            >
+              {answer.length} / {DEMO_MAX_FOLLOWUP_CHARS}
+            </div>
+          )}
 
           <div className="followup-actions">
             <button

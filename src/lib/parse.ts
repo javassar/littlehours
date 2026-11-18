@@ -25,6 +25,36 @@ export async function parseEntryInBackground(entryId: string): Promise<void> {
 
     if (error) {
       console.warn(`parse-entry returned error for ${entryId}:`, error.message);
+
+      // Milestone 3.9 Step 5 item 6: Check for demo_limit (HTTP 429)
+      let isDemoLimit = false;
+      try {
+        if ('context' in error && (error as any).context) {
+          const res = (error as any).context as Response;
+          if (res.status === 429) {
+            const body = await res.clone().json().catch(() => ({}));
+            if (body?.error === 'demo_limit') {
+              isDemoLimit = true;
+            }
+          }
+        }
+      } catch {
+        // ignore
+      }
+
+      if (isDemoLimit) {
+        // Keep parse_status = 'pending' with 'demo_limit' clarification
+        await supabase
+          .from('entries')
+          .update({
+            parse_status: 'pending',
+            clarification_question: 'demo_limit',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', entryId);
+        return;
+      }
+
       // Mark as failed in DB with friendly explanation so UI shows "Try again"
       const friendlyMsg =
         error.message?.includes('non-2xx') || error.message?.includes('546')

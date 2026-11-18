@@ -160,6 +160,24 @@ Deno.serve(async (req: Request) => {
       }`
     );
 
+    // Step 7: Skip anonymous demo users immediately if targeting a specific user
+    if (targetUserId) {
+      const { data: targetUser } = await supabase.auth.admin.getUserById(targetUserId);
+      if (targetUser?.user?.is_anonymous) {
+        console.log(`[send-reminders] Skipped user ${targetUserId}: skipped: demo user`);
+        return new Response(
+          JSON.stringify({
+            status: 'ok',
+            message: 'skipped: demo user',
+            users_checked: 1,
+            notifications_sent: 0,
+            skipped: [{ user_id: targetUserId, reason: 'skipped: demo user' }],
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     // 4. Load push subscriptions
     let subQuery = supabase
       .from('push_subscriptions')
@@ -229,6 +247,14 @@ Deno.serve(async (req: Request) => {
 
     // 6. Evaluate and send for each user
     for (const userId of userIds) {
+      // Step 7: Skip demo users
+      const { data: targetUser } = await supabase.auth.admin.getUserById(userId);
+      if (targetUser?.user?.is_anonymous) {
+        console.log(`[send-reminders] Skipped user ${userId}: skipped: demo user`);
+        skippedLog.push({ user_id: userId, reason: 'skipped: demo user' });
+        continue;
+      }
+
       const subs = userSubsMap.get(userId) || [];
       const userSettings = settingsMap.get(userId) || {};
 

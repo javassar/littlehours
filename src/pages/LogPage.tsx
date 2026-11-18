@@ -23,6 +23,7 @@ import {
 import { parseEntryInBackground } from '../lib/parse';
 import { STARTER_CATEGORIES } from '../lib/settings';
 import { OverlapAdjustmentsPayload } from '../lib/overlap';
+import { DEMO_MAX_TEXT_CHARS } from '../lib/demoConfig';
 
 const DRAFT_STORAGE_KEY = 'littlehours_draft_entry';
 
@@ -210,9 +211,14 @@ export const LogPage: React.FC = () => {
     };
   }, [user]);
 
+  const isAnonymous = Boolean(user?.is_anonymous);
+
   // Handle textarea text change and draft persistence
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const val = e.target.value;
+    let val = e.target.value;
+    if (isAnonymous && val.length > DEMO_MAX_TEXT_CHARS) {
+      val = val.slice(0, DEMO_MAX_TEXT_CHARS);
+    }
     setText(val);
     localStorage.setItem(DRAFT_STORAGE_KEY, val);
     adjustTextareaHeight();
@@ -273,7 +279,12 @@ export const LogPage: React.FC = () => {
 
         console.log(`[Poll attempt ${attempts}] parse_status: ${data.parse_status}, segments: ${data.segments?.length || 0}`);
 
-        if (data.parse_status === 'parsed') {
+        if (data.parse_status === 'pending' && data.clarification_question === 'demo_limit') {
+          clearInterval(interval);
+          console.log('[Poll] Entry hit demo limit');
+          setToastMessage('Not read: demo limit reached.');
+          setToastVisible(true);
+        } else if (data.parse_status === 'parsed') {
           clearInterval(interval);
           if (Array.isArray(data.segments) && data.segments.length > 0) {
             const sorted = [...data.segments].sort(
@@ -644,8 +655,23 @@ export const LogPage: React.FC = () => {
           onChange={handleTextChange}
           disabled={isSaving}
           rows={3}
+          maxLength={isAnonymous ? DEMO_MAX_TEXT_CHARS : undefined}
           aria-label="How did you spend your time?"
         />
+
+        {isAnonymous && (
+          <div
+            style={{
+              fontSize: 12,
+              color: 'var(--mauve)',
+              textAlign: 'right',
+              marginTop: 4,
+              marginBottom: 4,
+            }}
+          >
+            {text.length} / {DEMO_MAX_TEXT_CHARS}
+          </div>
+        )}
 
         {/* Milestone 3.7: PainRating directly below textarea and above Save button */}
         <div className="log-pain-rating-wrap" style={{ margin: '8px 0 14px 0' }}>

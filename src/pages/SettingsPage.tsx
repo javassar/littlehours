@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Button, Hummingbird, Chip, Toast, CategoriesSheet, PeopleSheet } from '../components';
+import { Card, Button, Hummingbird, Chip, Toast, CategoriesSheet, PeopleSheet, ModalPortal } from '../components';
+import { DEMO_RESETS_PER_DAY } from '../lib/demoConfig';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import {
@@ -235,6 +236,95 @@ export const SettingsPage: React.FC = () => {
       setSnoozeUntil(settings.snooze_until || null);
     }
   }, [settings]);
+
+  // Demo mode state (Milestone 3.9)
+  const isAnonymous = Boolean(user?.is_anonymous);
+  const [remainingResets, setRemainingResets] = useState<number | null>(null);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [isExiting, setIsExiting] = useState(false);
+
+  useEffect(() => {
+    if (isAnonymous) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.access_token) {
+          supabase.functions
+            .invoke('seed-demo', {
+              body: { get_resets: true },
+              headers: { Authorization: `Bearer ${session.access_token}` },
+            })
+            .then(({ data }) => {
+              if (typeof data?.remaining_resets === 'number') {
+                setRemainingResets(data.remaining_resets);
+              }
+            })
+            .catch((err) => {
+              console.warn('[settings] Could not fetch remaining demo resets:', err);
+            });
+        }
+      });
+    }
+  }, [isAnonymous]);
+
+  const handleExitDemo = async () => {
+    setIsExiting(true);
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        await supabase.functions.invoke('delete-demo-account', {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+      }
+    } catch (err) {
+      console.warn('[settings] delete-demo-account failed, signing out anyway:', err);
+    } finally {
+      await signOut();
+      setIsExiting(false);
+      setShowExitConfirm(false);
+      navigate('/login', { replace: true });
+    }
+  };
+
+  const handleResetSampleData = async () => {
+    setIsResetting(true);
+    try {
+      const browserTz =
+        settings?.timezone ||
+        Intl.DateTimeFormat().resolvedOptions().timeZone ||
+        'America/Phoenix';
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      const { data, error } = await supabase.functions.invoke('seed-demo', {
+        body: { reset: true, timezone: browserTz },
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+
+      if (error) {
+        showToast("I couldn't reset the sample data. Please try again.");
+      } else if (data?.error === 'demo_reset_limit') {
+        showToast(data.message || 'Daily reset limit reached.');
+      } else {
+        if (typeof data?.remaining_resets === 'number') {
+          setRemainingResets(data.remaining_resets);
+        } else if (remainingResets !== null) {
+          setRemainingResets(Math.max(0, remainingResets - 1));
+        }
+        showToast('Sample data restored');
+      }
+    } catch (err) {
+      console.warn('[settings] Reset sample data error:', err);
+      showToast("I couldn't reset the sample data. Please try again.");
+    } finally {
+      setIsResetting(false);
+      setShowResetConfirm(false);
+    }
+  };
 
   const availableTimezones = React.useMemo(() => {
     const list = [...COMMON_TIMEZONES];
@@ -826,12 +916,42 @@ export const SettingsPage: React.FC = () => {
       <Card className="settings-card mb-4">
         <h3 className="section-title">Account</h3>
         <p className="section-desc" style={{ marginBottom: 12 }}>
-          Signed in as <strong>{user?.email || 'Guest'}</strong>
+          {isAnonymous ? (
+            <>Signed in as <strong>Demo sandbox</strong></>
+          ) : (
+            <>Signed in as <strong>{user?.email || 'Guest'}</strong></>
+          )}
         </p>
-        <Button variant="secondary" onClick={handleSignOut}>
-          Log out
-        </Button>
+        {isAnonymous ? (
+          <Button variant="secondary" onClick={() => setShowExitConfirm(true)}>
+            Exit demo
+          </Button>
+        ) : (
+          <Button variant="secondary" onClick={handleSignOut}>
+            Log out
+          </Button>
+        )}
       </Card>
+
+      {/* Demo Sample Data Reset (Milestone 3.9) */}
+      {isAnonymous && (
+        <Card className="settings-card mb-4">
+          <h3 className="section-title">Sample Data</h3>
+          <p className="section-desc" style={{ marginBottom: 8 }}>
+            Restore the initial sample days of logged entries and pain ratings.
+          </p>
+          <p className="section-desc" style={{ marginBottom: 14, fontSize: 13, color: 'var(--mauve)' }}>
+            Resets remaining today: {remainingResets !== null ? `${remainingResets} of ${DEMO_RESETS_PER_DAY}` : '...'}
+          </p>
+          <Button
+            variant="secondary"
+            onClick={() => setShowResetConfirm(true)}
+            disabled={remainingResets !== null && remainingResets <= 0}
+          >
+            Reset sample data
+          </Button>
+        </Card>
+      )}
 
       {/* Vacation Mode (Milestone 3.7) */}
       <Card className="settings-card mb-4">
@@ -930,69 +1050,71 @@ export const SettingsPage: React.FC = () => {
         />
       )}
 
-      {/* Re-read All Entries (Milestone 2.6) */}
-      <Card className="settings-card mb-4">
-        <h3 className="section-title">Re-read Entries</h3>
-        <p className="section-desc" style={{ marginBottom: 8 }}>
-          Re-analyze your entries with the latest AI prompt model. To stay safely inside free tier
-          limits (15 requests per minute), entries are read one at a time with a pause between each.
-        </p>
-
-        {/* Switch to include confirmed segments */}
-        <div className="reread-toggle-group">
-          <label className="reread-toggle-label">
-            <input
-              type="checkbox"
-              checked={includeConfirmed}
-              onChange={(e) => setIncludeConfirmed(e.target.checked)}
-              disabled={isReReading}
-              aria-label="Include confirmed segments"
-            />
-            <span>Include confirmed segments</span>
-          </label>
-          <p className="reread-toggle-hint">
-            When unchecked, entries whose segments are already confirmed will be skipped.
+      {/* Re-read All Entries (Milestone 2.6, hidden in demo) */}
+      {!isAnonymous && (
+        <Card className="settings-card mb-4">
+          <h3 className="section-title">Re-read Entries</h3>
+          <p className="section-desc" style={{ marginBottom: 8 }}>
+            Re-analyze your entries with the latest AI prompt model. To stay safely inside free tier
+            limits (15 requests per minute), entries are read one at a time with a pause between each.
           </p>
-        </div>
 
-        {/* Progress Bar while re-reading */}
-        {isReReading && reReadProgress && (
-          <div className="reread-progress-container">
-            <div className="reread-progress-bar">
-              <div
-                className="reread-progress-fill"
-                style={{ width: `${reReadProgress.percent}%` }}
+          {/* Switch to include confirmed segments */}
+          <div className="reread-toggle-group">
+            <label className="reread-toggle-label">
+              <input
+                type="checkbox"
+                checked={includeConfirmed}
+                onChange={(e) => setIncludeConfirmed(e.target.checked)}
+                disabled={isReReading}
+                aria-label="Include confirmed segments"
               />
-            </div>
-            <div className="reread-progress-label">
-              Reading entry {reReadProgress.current} of {reReadProgress.total} (
-              {reReadProgress.percent}%)
-            </div>
+              <span>Include confirmed segments</span>
+            </label>
+            <p className="reread-toggle-hint">
+              When unchecked, entries whose segments are already confirmed will be skipped.
+            </p>
           </div>
-        )}
 
-        {/* Status text */}
-        {reReadStatusText && (
-          <div
-            className={reReadStatusText.includes('failed') ? 'sheet-error' : 'section-desc'}
-            style={{ marginTop: 10, marginBottom: 10 }}
-          >
-            {reReadStatusText}
-          </div>
-        )}
-
-        <div style={{ marginTop: 14 }}>
-          {isReReading ? (
-            <Button variant="destructive" onClick={handleStopReRead} aria-label="Stop re-reading">
-              Stop re-reading
-            </Button>
-          ) : (
-            <Button onClick={handleReReadAllEntries} aria-label="Re-read all entries">
-              Re-read all entries
-            </Button>
+          {/* Progress Bar while re-reading */}
+          {isReReading && reReadProgress && (
+            <div className="reread-progress-container">
+              <div className="reread-progress-bar">
+                <div
+                  className="reread-progress-fill"
+                  style={{ width: `${reReadProgress.percent}%` }}
+                />
+              </div>
+              <div className="reread-progress-label">
+                Reading entry {reReadProgress.current} of {reReadProgress.total} (
+                {reReadProgress.percent}%)
+              </div>
+            </div>
           )}
-        </div>
-      </Card>
+
+          {/* Status text */}
+          {reReadStatusText && (
+            <div
+              className={reReadStatusText.includes('failed') ? 'sheet-error' : 'section-desc'}
+              style={{ marginTop: 10, marginBottom: 10 }}
+            >
+              {reReadStatusText}
+            </div>
+          )}
+
+          <div style={{ marginTop: 14 }}>
+            {isReReading ? (
+              <Button variant="destructive" onClick={handleStopReRead} aria-label="Stop re-reading">
+                Stop re-reading
+              </Button>
+            ) : (
+              <Button onClick={handleReReadAllEntries} aria-label="Re-read all entries">
+                Re-read all entries
+              </Button>
+            )}
+          </div>
+        </Card>
+      )}
 
       {/* Prompt Versions Breakdown (Milestone 2.6) */}
       <Card className="settings-card mb-4">
@@ -1133,7 +1255,8 @@ export const SettingsPage: React.FC = () => {
         </div>
       </Card>
 
-      {/* Reminders Section (Milestone 3.1 & 3.4) */}
+      {/* Reminders Section (Milestone 3.1 & 3.4, hidden in demo) */}
+      {!isAnonymous && (
       <Card className="settings-card mb-4">
         <div className="reminders-status-row">
           <h3 className="section-title" style={{ margin: 0 }}>
@@ -1359,6 +1482,103 @@ export const SettingsPage: React.FC = () => {
           </div>
         )}
       </Card>
+      )}
+
+      {/* Confirmation modal for Reset Sample Data */}
+      {showResetConfirm && (
+        <ModalPortal>
+          <div
+            className="sheet-backdrop"
+            style={{ zIndex: 1000 }}
+            onClick={() => !isResetting && setShowResetConfirm(false)}
+          >
+            <div
+              className="sheet-content confirmation-sheet-content"
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: '100%',
+                maxWidth: 360,
+                textAlign: 'center',
+                borderRadius: 24,
+                padding: '24px 20px',
+              }}
+            >
+              <div className="entry-delete-confirm-box" style={{ margin: 0 }}>
+                <p className="entry-delete-confirm-text" style={{ fontSize: 18, marginBottom: 8 }}>
+                  Reset sample data?
+                </p>
+                <p className="entry-delete-confirm-sub" style={{ fontSize: 14, marginBottom: 20 }}>
+                  Your changes will be replaced with fresh sample data.
+                </p>
+                <div className="sheet-button-row">
+                  <Button
+                    variant="secondary"
+                    disabled={isResetting}
+                    onClick={() => setShowResetConfirm(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    disabled={isResetting}
+                    onClick={handleResetSampleData}
+                  >
+                    {isResetting ? 'Resetting...' : 'Reset'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
+      {/* Confirmation modal for Exit Demo */}
+      {showExitConfirm && (
+        <ModalPortal>
+          <div
+            className="sheet-backdrop"
+            style={{ zIndex: 1000 }}
+            onClick={() => !isExiting && setShowExitConfirm(false)}
+          >
+            <div
+              className="sheet-content confirmation-sheet-content"
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: '100%',
+                maxWidth: 360,
+                textAlign: 'center',
+                borderRadius: 24,
+                padding: '24px 20px',
+              }}
+            >
+              <div className="entry-delete-confirm-box" style={{ margin: 0 }}>
+                <p className="entry-delete-confirm-text" style={{ fontSize: 18, marginBottom: 8 }}>
+                  Exit the demo?
+                </p>
+                <p className="entry-delete-confirm-sub" style={{ fontSize: 14, marginBottom: 20 }}>
+                  Your sandbox will be deleted.
+                </p>
+                <div className="sheet-button-row">
+                  <Button
+                    variant="secondary"
+                    disabled={isExiting}
+                    onClick={() => setShowExitConfirm(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    disabled={isExiting}
+                    onClick={handleExitDemo}
+                  >
+                    {isExiting ? 'Exiting...' : 'Exit demo'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
 
       <div style={{ marginTop: 24, textAlign: 'center' }}>
         <Button variant="secondary" onClick={() => navigate('/design')}>

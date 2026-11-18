@@ -77,13 +77,35 @@ npm run preview
 
 ---
 
+## Live Demo
+
+A live demo is available at: `[Live Demo URL Placeholder]`
+
+Portfolio visitors can explore Little Hours directly in their browser without signing up or exposing any real user accounts. Tapping **Try the demo** creates a private temporary sandbox pre-populated with 7 days of realistic sample entries, segments, and pain ratings in the visitor's local timezone.
+
+### How the Demo is Protected
+- **Row-Level Security & Cryptographic Isolation**: Each visitor receives an independent temporary account via Supabase anonymous sign-in. Database RLS guarantees that visitors can never see or mutate any real account data or other visitors' sandboxes.
+- **Verified `is_anonymous` Claim**: Privileged Edge Functions (`seed-demo`, `delete-demo-account`) inspect the verified `is_anonymous` JWT claim from Supabase Auth before performing any operations, completely preventing anyone from seeding demo data into the owner's account.
+- **AI Usage Caps**: Demo visitors can test the Gemini natural language parsing with strict caps: 500 characters max per entry, 200 characters max per clarification follow-up, 15 AI parses per user per day, and a 300 daily global cap across all demo users tracked atomically via database RPC.
+- **Separate Gemini Key**: Demo parses run using a dedicated `GEMINI_API_KEY_DEMO` secret isolated from the owner's key. If the demo key is missing, demo requests fail gracefully rather than consuming owner credits.
+- **Cloudflare Turnstile Bot Protection**: "Try the demo" requests are guarded by Cloudflare Turnstile CAPTCHA to stop bots and automated scraping.
+- **Automated 7-Day Cleanup Job**: Expired demo sandboxes and usage records are deleted automatically after 7 days via a scheduled daily `pg_cron` database job (`03:00 UTC`), or immediately when a visitor taps **Exit demo**.
+- **Automated Isolation Tests**: A comprehensive test suite (`scripts/test-demo.ts`) verifies all 11 security constraints against the deployed project.
+
+### Privacy Note
+Text entered in the demo mode is processed by Google's Gemini API for activity parsing. Visitors are advised not to enter personal or sensitive information.
+
+---
+
 ## Environment Variables Reference
 
 | Variable | Location | Description |
 |---|---|---|
 | `VITE_SUPABASE_URL` | `.env.local` & Vercel | Supabase project URL |
 | `VITE_SUPABASE_ANON_KEY` | `.env.local` & Vercel | Supabase publishable anon public key |
-| `GEMINI_API_KEY` | Supabase Vault / Secret | Google Gemini API key (Stage 2) |
+| `VITE_TURNSTILE_SITE_KEY` | `.env.local` & Vercel | Cloudflare Turnstile public site key |
+| `GEMINI_API_KEY` | Supabase Vault / Secret | Google Gemini API key for owner account (Stage 2) |
+| `GEMINI_API_KEY_DEMO` | Supabase Vault / Secret | Google Gemini API key for demo sandboxes (Stage 3) |
 | `GEMINI_MODEL` | Supabase Vault / Secret | Gemini model name (Stage 2) |
 | `VITE_VAPID_PUBLIC_KEY` | `.env.local` & Vercel | Web Push VAPID public key (Stage 3) |
 | `VAPID_PRIVATE_KEY` | Supabase Secret | Web Push VAPID private key (Stage 3) |
@@ -131,6 +153,12 @@ npm run preview
   - **Reminders Update**: Skip reminders when logged or rated pain within the past 30 minutes. Notification body asks to rate pain.
   - **Pain Ratings Export**: Dedicated CSV and JSON exports with client-side join in `src/lib/export.ts` computing lookback windows (60, 180, 1440 min) and unlogged time.
   - **Data Privacy**: Complete separation between health pain ratings and the AI parser (`parse-entry`).
+- [x] **Milestone 3.9**: Demo Mode with Per-Visitor Sandboxes:
+  - **Anonymous Sandboxes**: Visitors can tap "Try the demo" for instant disposable sandbox with 7 days of realistic authored sample entries, segments, and pain ratings in their timezone.
+  - **Security & RLS**: Strict row-level security separating visitors and owner, verified `is_anonymous` JWT claims, push subscription restrictions, and service-role-only usage tables.
+  - **AI Limits & Key Separation**: Separate `GEMINI_API_KEY_DEMO`, 500 max characters per entry, 200 per follow-up, 15 parses/day per user, and 300 global parses/day.
+  - **Banner & Controls**: Sticky `--lavender` demo banner with "Exit demo", Settings sample data reset button with daily quota, and auto-cleanup after 7 days.
+  - **Bot Protection**: Cloudflare Turnstile CAPTCHA on demo access.
 
 ---
 

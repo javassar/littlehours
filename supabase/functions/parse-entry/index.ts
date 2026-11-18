@@ -6,6 +6,12 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { SYSTEM_PROMPT, PROMPT_VERSION } from './prompt.ts';
 import { validateParseResult, ParseResponse } from './validator.ts';
+import {
+  DEMO_MAX_TEXT_CHARS,
+  DEMO_MAX_FOLLOWUP_CHARS,
+  DEMO_PARSES_PER_USER_PER_DAY,
+  DEMO_PARSES_PER_DAY_GLOBAL,
+} from '../_shared/demoConfig.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -56,6 +62,60 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({ error: `Entry not found or unauthorized: ${entryErr?.message || ''}` }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // 1b. Check caller authentication & demo limits
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const isAnonymous = Boolean(user?.is_anonymous);
+
+    if (isAnonymous) {
+      // Enforce character length limits
+      if (entry.raw_text && entry.raw_text.length > DEMO_MAX_TEXT_CHARS) {
+        return new Response(JSON.stringify({ error: 'too_long' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const followUps = Array.isArray(entry.follow_ups) ? entry.follow_ups : [];
+      for (const fu of followUps) {
+        if (fu?.answer && typeof fu.answer === 'string' && fu.answer.length > DEMO_MAX_FOLLOWUP_CHARS) {
+          return new Response(JSON.stringify({ error: 'too_long' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+
+      // Check and increment demo usage via service_role admin client
+      const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+      const admin = createClient(supabaseUrl, supabaseServiceRoleKey);
+      const { data: usageData, error: usageErr } = await admin.rpc('increment_demo_usage', {
+        p_user: user!.id,
+        p_user_cap: DEMO_PARSES_PER_USER_PER_DAY,
+        p_global_cap: DEMO_PARSES_PER_DAY_GLOBAL,
+      });
+
+      if (usageErr) {
+        console.error('[parse-entry] increment_demo_usage RPC error:', usageErr);
+      } else if (usageData && usageData.allowed === false) {
+        console.log(`[parse-entry] Demo limit reached (scope: ${usageData.scope})`);
+        await supabase
+          .from('entries')
+          .update({
+            parse_status: 'pending',
+            clarification_question: 'demo_limit',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', entry.id);
+
+        return new Response(
+          JSON.stringify({ error: 'demo_limit', scope: usageData.scope }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // 2. Load settings & categories
@@ -161,12 +221,19 @@ Deno.serve(async (req: Request) => {
       .map((item) => item.name);
 
     // 4. Gemini API Configuration
-    const rawApiKey = Deno.env.get('GEMINI_API_KEY');
+    const keyScope = isAnonymous ? 'demo' : 'owner';
+    console.log(`[parse-entry] Key scope: ${keyScope}`);
+
+    const rawApiKey = isAnonymous
+      ? Deno.env.get('GEMINI_API_KEY_DEMO')
+      : Deno.env.get('GEMINI_API_KEY');
     const apiKey = rawApiKey ? rawApiKey.trim() : null;
     const configuredModel = (Deno.env.get('GEMINI_MODEL') || '').trim();
 
     if (!apiKey) {
-      const missingKeyMsg = 'GEMINI_API_KEY secret is not set in Supabase. Run: npx supabase secrets set GEMINI_API_KEY=...';
+      const missingKeyMsg = isAnonymous
+        ? 'GEMINI_API_KEY_DEMO secret is not set in Supabase.'
+        : 'GEMINI_API_KEY secret is not set in Supabase. Run: npx supabase secrets set GEMINI_API_KEY=...';
       await supabase
         .from('entries')
         .update({
