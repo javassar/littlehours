@@ -259,8 +259,8 @@
 }
 
 .confirmation-time-input:focus {
-  outline: 2px solid var(--gold);
-  border-color: var(--rose-deep);
+  outline: 2px solid var(--danger);
+  border-color: var(--danger);
 }
 
 .confirmation-segment-duration {
@@ -303,9 +303,9 @@
 }
 
 .confirmation-label-input:focus {
-  outline: 2px solid var(--gold);
+  outline: 2px solid var(--danger);
   outline-offset: 2px;
-  border-color: var(--rose-deep);
+  border-color: var(--danger);
 }
 
 /* Category Picker Row */
@@ -329,7 +329,7 @@
 }
 
 .confirmation-category-select:focus {
-  outline: 2px solid var(--gold);
+  outline: 2px solid var(--danger);
   outline-offset: 2px;
 }
 
@@ -414,7 +414,7 @@
 }
 
 .confirmation-boundary-input:focus {
-  outline: 2px solid var(--gold);
+  outline: 2px solid var(--danger);
   border-radius: 4px;
 }
 
@@ -496,6 +496,6 @@
 }
 
 .confirmation-company-input:focus {
-  outline: 2px solid var(--gold);
-  border-color: transparent;
+  outline: 2px solid var(--danger);
+  border-color: var(--danger);
 }

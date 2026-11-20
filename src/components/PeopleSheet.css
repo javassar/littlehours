@@ -193,6 +193,11 @@
   outline: none;
 }
 
+.person-inline-rename-input:focus {
+  border-color: var(--danger);
+  outline: 2px solid var(--danger);
+}
+
 .person-inline-save-btn {
   font-family: var(--font-body);
   font-size: 12px;

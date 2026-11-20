@@ -1,8 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { Card, Button, Swan, RotatingSparkle, TurnstileWidget, TurnstileWidgetRef } from '../components';
+import {
+  Card,
+  Button,
+  DoubleSwans,
+  RotatingSparkle,
+  TurnstileWidget,
+  TurnstileWidgetRef,
+  BotanicalCorner,
+} from '../components';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
+import './LoginPage.css';
 
 export const LoginPage: React.FC = () => {
   const { user, signIn, signInAnonymously, isConfigured } = useAuth();
@@ -162,110 +171,193 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="page-container screen-fade-in login-page-container">
-      <div className="login-header">
-        <Swan size={100} />
-        <h2 className="login-title">Welcome to Little Hours</h2>
-        <p className="login-subtitle">A record of your days</p>
+    <div className="login-storybook-wrapper screen-fade-in">
+      {/* Tactile layered background: Parchment paper grain + faint damask watermark */}
+      <div className="login-storybook-bg" aria-hidden="true">
       </div>
 
-      <Card ornamental={true} className="login-card">
-        <form onSubmit={handleSubmit} className="login-form">
-          {!isConfigured && (
-            <div className="login-unconfigured-note">
-              Supabase keys are not set yet. Please add your <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> to <code>.env.local</code>.
+      {/* Full-Page Storybook Outer Double-Line Border & Botanical Corner Vignettes */}
+      <div className="login-storybook-frame" aria-hidden="true">
+        <div className="login-storybook-frame-inner" />
+        <BotanicalCorner variant="tl" className="login-corner-flourish corner-flourish-tl" />
+        <BotanicalCorner variant="tr" className="login-corner-flourish corner-flourish-tr" />
+        <BotanicalCorner variant="bl" className="login-corner-flourish corner-flourish-bl" />
+        <BotanicalCorner variant="br" className="login-corner-flourish corner-flourish-br" />
+      </div>
+
+      {/* Bottom Antique Scrollwork */}
+      <div className="login-bottom-scrollwork" aria-hidden="true" />
+
+      {/* Centered Page Content Container */}
+      <div className="page-container login-page-container">
+        <div className="login-header">
+          {/* Pair of graceful, hand-drawn sketch swans based on image_22 and image_23 */}
+          <div className="login-swan-container">
+            <DoubleSwans width={125} height={78} />
+          </div>
+          <h2 className="login-title">Welcome to Little Hours</h2>
+          <p className="login-subtitle">
+            <RotatingSparkle size={16} color="var(--rose-deep)" />
+            <span>~ A record of your days ~</span>
+            <RotatingSparkle size={16} color="var(--rose-deep)" />
+          </p>
+        </div>
+
+        <Card ornamental={true} className="login-card">
+          <form onSubmit={handleSubmit} className="login-form">
+            {!isConfigured && (
+              <div className="login-unconfigured-note">
+                Supabase keys are not set yet. Please add your <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> to <code>.env.local</code>.
+              </div>
+            )}
+
+            {error && (
+              <div className="login-error-message" role="alert">
+                {error}
+              </div>
+            )}
+
+            {/* Email field with cream fill, hairline dusty-rose border, and corner scrollwork */}
+            <div className="form-group">
+              <label className="form-label" htmlFor="login-email">Email</label>
+              <div className="login-input-frame">
+                <input
+                  id="login-email"
+                  type="email"
+                  className="time-log-input login-input-field"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  autoComplete="email"
+                  required
+                  disabled={submitting}
+                />
+                <svg className="login-input-scroll input-scroll-tl" viewBox="0 0 11 11" fill="none" aria-hidden="true">
+                  <path d="M2 10 C2 5.5, 5.5 2, 10 2" stroke="var(--rose-deep)" strokeWidth="0.8" />
+                  <circle cx="3" cy="3" r="0.8" fill="var(--rose-deep)" />
+                </svg>
+                <svg className="login-input-scroll input-scroll-tr" viewBox="0 0 11 11" fill="none" aria-hidden="true">
+                  <path d="M2 10 C2 5.5, 5.5 2, 10 2" stroke="var(--rose-deep)" strokeWidth="0.8" />
+                  <circle cx="3" cy="3" r="0.8" fill="var(--rose-deep)" />
+                </svg>
+                <svg className="login-input-scroll input-scroll-bl" viewBox="0 0 11 11" fill="none" aria-hidden="true">
+                  <path d="M2 10 C2 5.5, 5.5 2, 10 2" stroke="var(--rose-deep)" strokeWidth="0.8" />
+                  <circle cx="3" cy="3" r="0.8" fill="var(--rose-deep)" />
+                </svg>
+                <svg className="login-input-scroll input-scroll-br" viewBox="0 0 11 11" fill="none" aria-hidden="true">
+                  <path d="M2 10 C2 5.5, 5.5 2, 10 2" stroke="var(--rose-deep)" strokeWidth="0.8" />
+                  <circle cx="3" cy="3" r="0.8" fill="var(--rose-deep)" />
+                </svg>
+              </div>
             </div>
-          )}
 
-          {error && (
-            <div className="login-error-message" role="alert">
-              {error}
+            {/* Password field with cream fill, hairline dusty-rose border, and corner scrollwork */}
+            <div className="form-group" style={{ marginTop: 14 }}>
+              <label className="form-label" htmlFor="login-password">Password</label>
+              <div className="login-input-frame">
+                <input
+                  id="login-password"
+                  type="password"
+                  className="time-log-input login-input-field"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                  required
+                  disabled={submitting}
+                />
+                <svg className="login-input-scroll input-scroll-tl" viewBox="0 0 11 11" fill="none" aria-hidden="true">
+                  <path d="M2 10 C2 5.5, 5.5 2, 10 2" stroke="var(--rose-deep)" strokeWidth="0.8" />
+                  <circle cx="3" cy="3" r="0.8" fill="var(--rose-deep)" />
+                </svg>
+                <svg className="login-input-scroll input-scroll-tr" viewBox="0 0 11 11" fill="none" aria-hidden="true">
+                  <path d="M2 10 C2 5.5, 5.5 2, 10 2" stroke="var(--rose-deep)" strokeWidth="0.8" />
+                  <circle cx="3" cy="3" r="0.8" fill="var(--rose-deep)" />
+                </svg>
+                <svg className="login-input-scroll input-scroll-bl" viewBox="0 0 11 11" fill="none" aria-hidden="true">
+                  <path d="M2 10 C2 5.5, 5.5 2, 10 2" stroke="var(--rose-deep)" strokeWidth="0.8" />
+                  <circle cx="3" cy="3" r="0.8" fill="var(--rose-deep)" />
+                </svg>
+                <svg className="login-input-scroll input-scroll-br" viewBox="0 0 11 11" fill="none" aria-hidden="true">
+                  <path d="M2 10 C2 5.5, 5.5 2, 10 2" stroke="var(--rose-deep)" strokeWidth="0.8" />
+                  <circle cx="3" cy="3" r="0.8" fill="var(--rose-deep)" />
+                </svg>
+              </div>
             </div>
-          )}
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="login-email">Email</label>
-            <input
-              id="login-email"
-              type="email"
-              className="time-log-input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              autoComplete="email"
-              required
-              disabled={submitting}
-            />
-          </div>
-
-          <div className="form-group" style={{ marginTop: 14 }}>
-            <label className="form-label" htmlFor="login-password">Password</label>
-            <input
-              id="login-password"
-              type="password"
-              className="time-log-input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              autoComplete="current-password"
-              required
-              disabled={submitting}
-            />
-          </div>
-
-          <TurnstileWidget
-            ref={turnstileRef}
-            onToken={() => {
-              setError(null);
-            }}
-            onError={() => {
-              setError("Verification couldn't load. If you use an ad blocker or privacy extension, please pause it and refresh.");
-            }}
-          />
-
-          <div style={{ marginTop: 16 }}>
-            <Button fullWidth type="submit" disabled={submitting}>
-              {submitting ? 'Signing in...' : 'Sign In'}
-            </Button>
-          </div>
-
-          <div style={{ marginTop: 24, textAlign: 'center' }}>
-            <Button
-              variant="secondary"
-              fullWidth
-              type="button"
-              onClick={handleTryDemo}
-              disabled={submitting}
-            >
-              Try the demo
-            </Button>
-            <p
-              style={{
-                margin: '10px 0 0 0',
-                fontSize: 12,
-                lineHeight: 1.4,
-                color: 'var(--mauve)',
+            <TurnstileWidget
+              ref={turnstileRef}
+              onToken={() => {
+                setError(null);
               }}
-            >
-
-              Entries you type are processed by an LLM, so enter personal information according to your comfort.
-            </p>
-            <p
-              style={{
-                margin: '18px 0 0 0',
-                fontSize: 12,
-                fontFamily: 'var(--font-display)',
-                fontStyle: 'italic',
-                color: 'var(--mauve)',
-                opacity: 0.8,
-                letterSpacing: '0.02em',
+              onError={() => {
+                setError("Verification couldn't load. If you use an ad blocker or privacy extension, please pause it and refresh.");
               }}
-            >
-              Protected by Cloudflare           
-               </p>
-          </div>
-        </form>
-      </Card>
+            />
+
+            <div style={{ marginTop: 16 }}>
+              <Button fullWidth type="submit" disabled={submitting}>
+                {submitting ? 'Signing in...' : 'Sign In'}
+              </Button>
+            </div>
+
+            {/* Botanical fleuron / diamond divider */}
+            <div className="login-fleuron-divider" aria-hidden="true">
+              <span className="login-divider-line" />
+              <span className="login-divider-fleuron">
+                <svg width="38" height="16" viewBox="0 0 38 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M2 8 H11" stroke="var(--rose-deep)" strokeWidth="0.75" opacity="0.6" strokeLinecap="round" />
+                  <path d="M27 8 H36" stroke="var(--rose-deep)" strokeWidth="0.75" opacity="0.6" strokeLinecap="round" />
+                  {/* Central diamond fleuron */}
+                  <path d="M19 2.5 L22.5 8 L19 13.5 L15.5 8 Z" stroke="var(--rose-deep)" strokeWidth="0.85" fill="var(--surface)" />
+                  <circle cx="19" cy="8" r="1.2" fill="var(--rose-deep)" opacity="0.8" />
+                  {/* Petal foliate curls */}
+                  <path d="M13.5 8 C12.5 5.5, 10 5, 8.5 6.5 C7.5 7.8, 8.5 10, 11 9" stroke="var(--rose-deep)" strokeWidth="0.75" opacity="0.7" />
+                  <path d="M24.5 8 C25.5 5.5, 28 5, 29.5 6.5 C30.5 7.8, 29.5 10, 27 9" stroke="var(--rose-deep)" strokeWidth="0.75" opacity="0.7" />
+                  <circle cx="8.5" cy="6.5" r="0.6" fill="var(--rose-deep)" opacity="0.6" />
+                  <circle cx="29.5" cy="6.5" r="0.6" fill="var(--rose-deep)" opacity="0.6" />
+                </svg>
+              </span>
+              <span className="login-divider-line" />
+            </div>
+
+            <div style={{ textAlign: 'center' }}>
+              <Button
+                variant="secondary"
+                fullWidth
+                type="button"
+                onClick={handleTryDemo}
+                disabled={submitting}
+              >
+                Try the demo
+              </Button>
+              <p
+                style={{
+                  margin: '10px 0 0 0',
+                  fontSize: 12,
+                  lineHeight: 1.4,
+                  color: 'var(--mauve)',
+                }}
+              >
+                Entries you type are processed by an LLM, so enter personal information according to your comfort.
+              </p>
+              <p
+                style={{
+                  margin: '18px 0 0 0',
+                  fontSize: 12,
+                  fontFamily: 'var(--font-display)',
+                  fontStyle: 'italic',
+                  color: 'var(--mauve)',
+                  opacity: 0.8,
+                  letterSpacing: '0.02em',
+                }}
+              >
+                Protected by Cloudflare           
+              </p>
+            </div>
+          </form>
+        </Card>
+      </div>
     </div>
   );
 };

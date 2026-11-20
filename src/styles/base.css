@@ -41,7 +41,7 @@ html {
   line-height: var(--text-body-line-height);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: var(--bg);
+  background-color: var(--bg-deep);
 }
 
 body {
@@ -49,7 +49,8 @@ body {
   min-height: 100dvh;
   position: relative;
   overflow-x: hidden;
-  background: linear-gradient(180deg, var(--bg) 0%, var(--bg-deep) 100%);
+  background-color: var(--bg-deep);
+  background: var(--bg-deep);
   color: var(--ink);
 }
 
@@ -107,9 +108,9 @@ body::after {
   }
 }
 
-/* Focus ring on every focusable element */
+/* Focus ring on every focusable element (--danger #A8505E) */
 :focus-visible {
-  outline: 2px solid var(--gold) !important;
+  outline: 2px solid var(--danger) !important;
   outline-offset: 2px !important;
 }
 

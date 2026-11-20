@@ -1,6 +1,6 @@
 :root {
   /* Color tokens */
-  --bg: #F6EDEA;
+  --bg: #EBD9D6;
   --bg-deep: #EBD9D6;
   --surface: #FBF6F3;
   --surface-sunk: #F3E6E3;
@@ -13,6 +13,7 @@
   --lavender: #C9BBD6;
   --gold: #D4B483;
   --danger: #A8505E;
+  --focus-ring: var(--danger);
 
   /* Typography */
   --font-display: "Cormorant Garamond", Georgia, serif;

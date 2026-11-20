@@ -5,7 +5,7 @@ export const Deer: React.FC<IllustrationProps> = ({
   size,
   width = 96,
   height = 96,
-  color = 'var(--mauve)',
+  color = 'var(--rose-deep)',
   opacity = 0.6,
   className = '',
 }) => {

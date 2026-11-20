@@ -1,6 +1,6 @@
-# Milestone 3.9: Demo mode with per-visitor sandboxes
+# Milestone 3.8: Demo mode with per-visitor sandboxes
 
-This file extends `SPEC.md`, `SPEC-3.7.md`, and `SPEC-3.8.md`. Milestones 1.1 to 3.8 are finished. Do not edit any earlier spec file. Build only milestone 3.9 from this file, and follow the standing rules in `AGENTS.md`.
+This file extends `SPEC.md`, `SPEC-3.7.md`, and `SPEC-3.7.md`. Milestones 1.1 to 3.7 are finished. Do not edit any earlier spec file. Build only milestone 3.8 from this file, and follow the standing rules in `AGENTS.md`.
 
 Before writing any code, read the earlier specs and the current code for login, row-level security, the Edge Functions (`parse-entry`, `send-reminders`), Settings, and History. Where the existing code differs from the specs, follow the code and mention the difference in your summary. Where this file conflicts with an earlier spec, this file wins.
 
@@ -41,7 +41,7 @@ Before any change, audit the current database and functions, and report the resu
 1. List every table, every row-level security policy, every view, and every database function in the `public` schema. Confirm each table has row-level security enabled.
 2. Confirm every policy limits rows to the caller with `user_id = auth.uid()` and has a matching `with check`. Flag any policy that uses `using (true)`, is granted to a broad role, or reads another user's rows. Fix anything flagged.
 3. List every Edge Function and say which ones use the service role key. For each one that does, confirm it only touches rows belonging to the caller, or skips anonymous users.
-4. Confirm that no function that calls the Gemini API reads `pain_ratings`, as required in `SPEC-3.8.md`.
+4. Confirm that no function that calls the Gemini API reads `pain_ratings`, as required in `SPEC-3.7.md`.
 5. Confirm normal email sign-ups are closed, and describe how you checked.
 
 ## Step 1: Migration
@@ -100,7 +100,7 @@ Create `supabase/functions/seed-demo`. The app calls it right after a visitor si
 8. Each day has 8 to 11 entries covering waking hours, written in the same voice as a real log. Every entry is stored as already parsed: `parse_status = 'parsed'`, with segments inserted directly (so seeding calls no AI), `confirmed = true`, `model = 'seed'`, and `prompt_version = 'seed'`. Segment times must be contiguous inside each entry's window.
 9. Author the days from 3 templates (a working weekday, a weekend with an event, and a day with a vacation, where `on_vacation` is true and every segment is "vacation"), varied so no two days are identical. Together the week must use at least 15 of the 25 categories, including doomscrolling, social media, events, piano, hobbies, admin, and healthcare, and must show company on some segments.
 10. Use invented names for people, such as "roommate", "Sam", "Priya", and "Dana". Do not use "mom", "Gray", or any name from my real data.
-11. Add invented pain ratings: one per hourly entry on most days, linked by `entry_id`, plus 3 or 4 rating-only saves. Follow `SPEC-3.8.md` (each rating describes the hour ending at `rated_at`). Make the pattern plausible but plain, with ratings between 1 and 4, mostly 2 and 3.
+11. Add invented pain ratings: one per hourly entry on most days, linked by `entry_id`, plus 3 or 4 rating-only saves. Follow `SPEC-3.7.md` (each rating describes the hour ending at `rated_at`). Make the pattern plausible but plain, with ratings between 1 and 4, mostly 2 and 3.
 12. Keep the authored data in `supabase/functions/seed-demo/data.ts`, easy to read and edit. Here are sample entries for the voice:
 
 | Raw text | Segments |
@@ -225,5 +225,5 @@ Update `.env.example` with the new names.
 
 - Show me the migration before running it, and ask before running it.
 - Tell me when to switch on CAPTCHA and anonymous sign-ins, and do not assume I have done it.
-- Propose one git commit message at the end, such as "Milestone 3.9: demo mode with per-visitor sandboxes", and wait for my yes.
+- Propose one git commit message at the end, such as "Milestone 3.8: demo mode with per-visitor sandboxes", and wait for my yes.
 - Update `README.md` as described in Step 11.

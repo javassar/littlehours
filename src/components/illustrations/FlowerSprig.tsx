@@ -5,7 +5,7 @@ export const FlowerSprig: React.FC<IllustrationProps> = ({
   size,
   width = 64,
   height = 80,
-  color = 'var(--mauve)',
+  color = 'var(--rose-deep)',
   opacity = 0.6,
   className = '',
 }) => {

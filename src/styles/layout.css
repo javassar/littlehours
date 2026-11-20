@@ -1,7 +1,7 @@
 /* Page Layout & Container */
 .page-container {
   flex: 1;
-  padding: 16px 16px calc(96px + env(safe-area-inset-bottom, 0px)) 16px;
+  padding: 24px 16px calc(96px + env(safe-area-inset-bottom, 0px)) 16px;
   width: 100%;
   max-width: 480px;
   margin: 0 auto;
@@ -50,6 +50,19 @@
   resize: vertical;
 }
 
+.time-log-input:focus,
+.time-log-textarea:focus {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 2px rgba(168, 80, 94, 0.25), var(--shadow-input-sunk);
+  outline: none;
+}
+
+.time-log-input:focus-visible,
+.time-log-textarea:focus-visible {
+  outline: 2px solid var(--danger) !important;
+  outline-offset: 1px !important;
+}
+
 .time-log-input::placeholder,
 .time-log-textarea::placeholder {
   font-family: var(--font-display);
@@ -70,7 +83,8 @@
 
 /* Log Screen Elements */
 .log-window-header {
-  margin-bottom: 14px;
+  margin-top: 10px;
+  margin-bottom: 11px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -516,7 +530,7 @@
 }
 
 .history-retry-btn:focus-visible {
-  outline: 2px solid var(--gold);
+  outline: 2px solid var(--danger);
   outline-offset: 2px;
 }
 
@@ -1004,8 +1018,8 @@
 }
 
 .reminders-select:focus {
-  border-color: var(--rose-deep);
-  box-shadow: 0 0 0 2px var(--gold);
+  border-color: var(--danger);
+  box-shadow: 0 0 0 2px var(--danger);
 }
 
 .reminders-snooze-banner {

@@ -66,7 +66,7 @@
 }
 
 .pain-rating-buttons:focus-visible {
-  outline: 2px solid var(--gold);
+  outline: 2px solid var(--danger);
   border-radius: 999px;
 }
 
@@ -104,7 +104,7 @@
 }
 
 .pain-rating-btn:focus-visible {
-  outline: 2px solid var(--gold);
+  outline: 2px solid var(--danger);
   outline-offset: 2px;
 }
 

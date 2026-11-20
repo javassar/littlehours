@@ -107,6 +107,12 @@
   text-align: left;
   accent-color: var(--rose-deep);
   outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.sheet-datetime-input:focus {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 2px rgba(168, 80, 94, 0.25);
 }
 
 .sheet-datetime-input::-webkit-date-and-time-value {

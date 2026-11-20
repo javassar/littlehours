@@ -11,9 +11,8 @@ export const Header: React.FC<HeaderProps> = ({ title = 'Little Hours' }) => {
       <div className="header-inner">
         <h1 className="header-title">{title}</h1>
       </div>
-      {/* Scalloped lace edge along the bottom */}
-      <div className="header-lace" aria-hidden="true" />
-      <div className="header-lace-dots" aria-hidden="true" />
+      {/* Intricate vintage lace trim hanging below header */}
+      <div className="header-lace-trim" aria-hidden="true" />
     </header>
   );
 };

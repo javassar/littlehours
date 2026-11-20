@@ -160,8 +160,8 @@
 
 .categories-add-input:focus,
 .categories-add-desc-input:focus {
-  border-color: var(--rose-deep);
-  outline: 2px solid var(--gold);
+  border-color: var(--danger);
+  outline: 2px solid var(--danger);
 }
 
 .categories-add-btn {
@@ -298,6 +298,11 @@
   border-radius: 8px;
   padding: 4px 8px;
   outline: none;
+}
+
+.category-inline-rename-input:focus {
+  border-color: var(--danger);
+  outline: 2px solid var(--danger);
 }
 
 .category-inline-save-btn {

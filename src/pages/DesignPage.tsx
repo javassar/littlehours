@@ -7,6 +7,7 @@ import {
   SparkleBurst,
   RotatingSparkle,
   Swan,
+  DoubleSwans,
   Deer,
   Hummingbird,
   FlowerSprig,
@@ -20,7 +21,7 @@ export const DesignPage: React.FC = () => {
   const [designPain, setDesignPain] = useState<number | null>(3);
 
   const colors = [
-    { token: '--bg', hex: '#F6EDEA', name: 'Page Background' },
+    { token: '--bg', hex: '#EBD9D6', name: 'Page Background' },
     { token: '--bg-deep', hex: '#EBD9D6', name: 'Gradient Deep' },
     { token: '--surface', hex: '#FBF6F3', name: 'Cream Surface' },
     { token: '--surface-sunk', hex: '#F3E6E3', name: 'Sunk Input Surface' },
@@ -31,7 +32,7 @@ export const DesignPage: React.FC = () => {
     { token: '--sage', hex: '#A9B29B', name: 'Sage Green' },
     { token: '--slate', hex: '#8C9BB5', name: 'Slate Blue' },
     { token: '--lavender', hex: '#C9BBD6', name: 'Lavender Tint' },
-    { token: '--gold', hex: '#D4B483', name: 'Gold Focus / Sparkle' },
+    { token: '--gold', hex: '#D4B483', name: 'Gold Sparkle' },
     { token: '--danger', hex: '#A8505E', name: 'Danger Text' },
   ];
 
@@ -191,9 +192,15 @@ export const DesignPage: React.FC = () => {
         <h3 className="section-title">Inline SVG Illustrations</h3>
         <div className="illustrations-grid">
           <div className="illustration-box">
-            <Swan size={80} />
-            <span className="illustration-title">Swan</span>
-            <span className="illustration-desc">Login screen</span>
+            <DoubleSwans width={96} height={60} />
+            <span className="illustration-title">Paired Swans</span>
+            <span className="illustration-desc">Login header mark</span>
+          </div>
+
+          <div className="illustration-box">
+            <Swan size={74} celestial={true} />
+            <span className="illustration-title">Celestial Swan</span>
+            <span className="illustration-desc">Storybook mark</span>
           </div>
 
           <div className="illustration-box">

@@ -21,4 +21,6 @@ export * from './DemoBanner';
 export * from './TurnstileWidget';
 export * from './ModalPortal';
 export * from './ConfirmModal';
+export * from './BotanicalCorner';
+export * from './CameoWreath';
 export * from './illustrations';
