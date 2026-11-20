@@ -4,8 +4,8 @@
   left: 0;
   right: 0;
   z-index: 900;
-  background-color: var(--surface);
-  padding-top: env(safe-area-inset-top, 0px);
+  background-color: #F6EDEA;
+  padding-top: env(safe-area-inset-top);
   box-shadow: 0 2px 12px rgba(75, 51, 64, 0.05);
 }
 
