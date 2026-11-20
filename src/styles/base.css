@@ -34,6 +34,14 @@ input[type="time"]::-webkit-date-and-time-value {
   min-height: 1.2em;
 }
 
+/* 1. Lock the Root Viewport */
+html, body, #root {
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  background-color: #F6EDEA;
+}
+
 html {
   font-size: var(--text-body-size);
   color: var(--ink);
@@ -41,16 +49,11 @@ html {
   line-height: var(--text-body-line-height);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: var(--bg-deep);
 }
 
 body {
-  min-height: 100vh;
-  min-height: 100dvh;
   position: relative;
-  overflow-x: hidden;
-  background-color: #F5EAE7;
-  background: #F5EAE7;
+  background: #F6EDEA;
   color: var(--ink);
 }
 
@@ -84,13 +87,12 @@ body::after {
 
 /* Safe viewport container centered, max 480px */
 #root {
-  min-height: 100vh;
-  min-height: 100dvh;
   position: relative;
   z-index: 1;
   display: flex;
   flex-direction: column;
   max-width: 480px;
+  width: 100%;
   margin: 0 auto;
 }
 

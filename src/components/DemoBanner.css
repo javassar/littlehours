@@ -1,4 +1,5 @@
 .demo-banner {
+  flex-shrink: 0;
   background-color: var(--lavender);
   color: var(--ink);
   font-family: var(--font-display);

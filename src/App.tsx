@@ -19,12 +19,22 @@ export const App: React.FC = () => {
   }, [user]);
 
   return (
-    <>
+    <div className="app-wrapper">
       {showNav && <Header />}
       {showNav && user?.is_anonymous && <DemoBanner />}
       {showNav && !user?.is_anonymous && <InstallBanner />}
       
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <main
+        className="app-main pb-28"
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0,
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
+        }}
+      >
         <Routes>
           <Route
             path="/"
@@ -56,7 +66,7 @@ export const App: React.FC = () => {
       </main>
 
       {showNav && <TabBar />}
-    </>
+    </div>
   );
 };
 
