@@ -10,6 +10,21 @@
   background-color: #F6EDEA;
 }
 
+/* Solid Fixed Status-Bar Cap (Kills iOS Status Bar Blur) */
+.status-bar-cap {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 12px;
+  height: max(env(safe-area-inset-top), 12px);
+  height: max(env(safe-area-inset-top, 0px), 12px);
+  background-color: #F6EDEA;
+  background: #F6EDEA;
+  z-index: 50;
+  pointer-events: none;
+}
+
 /* Scrollable Main Content Container */
 .app-main {
   flex: 1;

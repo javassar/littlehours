@@ -1,11 +1,15 @@
 .app-header {
-  position: relative;
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
   flex-shrink: 0;
   width: 100%;
-  z-index: 900;
+  z-index: 40;
   background-color: #F6EDEA;
   background: #F6EDEA;
-  padding-top: env(safe-area-inset-top, 0px);
+  padding-top: calc(env(safe-area-inset-top) + 0.75rem);
+  padding-top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
   box-shadow: 0 2px 12px rgba(75, 51, 64, 0.05);
 }
 

@@ -20,6 +20,8 @@ export const App: React.FC = () => {
 
   return (
     <div className="app-wrapper">
+      {/* Solid Fixed Status-Bar Cap (Kills iOS Status Bar Blur) */}
+      <div className="status-bar-cap" aria-hidden="true" />
       {showNav && <Header />}
       {showNav && user?.is_anonymous && <DemoBanner />}
       {showNav && !user?.is_anonymous && <InstallBanner />}
