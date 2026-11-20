@@ -16,8 +16,8 @@ declare global {
       ) => string;
       reset: (widgetId: string) => void;
       remove: (widgetId: string) => void;
-      ready?: (callback: () => void) => void;
     };
+    onloadTurnstileCallback?: () => void;
   }
 }
 
@@ -63,7 +63,7 @@ export const TurnstileWidget = forwardRef<TurnstileWidgetRef, TurnstileWidgetPro
       let checkTimeout: ReturnType<typeof setTimeout> | null = null;
 
       const renderWidget = () => {
-        if (!isMounted || !containerRef.current || !window.turnstile) return;
+        if (!isMounted || !containerRef.current || !window.turnstile?.render) return;
 
         // Clean up any existing widget in container
         if (widgetIdRef.current) {
@@ -104,32 +104,27 @@ export const TurnstileWidget = forwardRef<TurnstileWidgetRef, TurnstileWidgetPro
         }
       };
 
-      const startRender = () => {
-        if (!isMounted) return;
-
-        if (window.turnstile) {
-          if (typeof window.turnstile.ready === 'function') {
-            window.turnstile.ready(renderWidget);
-          } else {
-            renderWidget();
-          }
-          return;
+      // Register official Cloudflare onload callback
+      window.onloadTurnstileCallback = () => {
+        if (isMounted) {
+          renderWidget();
         }
+      };
 
-        // Script might still be loading, poll until window.turnstile is ready
+      // If the Turnstile API is already loaded in the window
+      if (window.turnstile?.render) {
+        renderWidget();
+      } else {
+        // Fallback polling in case the script loaded just before attaching callback
         checkInterval = setInterval(() => {
           if (!isMounted) {
             if (checkInterval) clearInterval(checkInterval);
             return;
           }
-          if (window.turnstile) {
+          if (window.turnstile?.render) {
             if (checkInterval) clearInterval(checkInterval);
             checkInterval = null;
-            if (typeof window.turnstile.ready === 'function') {
-              window.turnstile.ready(renderWidget);
-            } else {
-              renderWidget();
-            }
+            renderWidget();
           }
         }, 100);
 
@@ -137,12 +132,13 @@ export const TurnstileWidget = forwardRef<TurnstileWidgetRef, TurnstileWidgetPro
           if (checkInterval) clearInterval(checkInterval);
           checkInterval = null;
         }, 10000);
-      };
-
-      startRender();
+      }
 
       return () => {
         isMounted = false;
+        if (window.onloadTurnstileCallback) {
+          window.onloadTurnstileCallback = undefined;
+        }
         if (checkInterval) clearInterval(checkInterval);
         if (checkTimeout) clearTimeout(checkTimeout);
         if (widgetIdRef.current && window.turnstile) {
