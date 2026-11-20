@@ -3,7 +3,6 @@ import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import {
   Card,
   Button,
-  DoubleSwans,
   RotatingSparkle,
   TurnstileWidget,
   TurnstileWidgetRef,
@@ -11,6 +10,7 @@ import {
 } from '../components';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
+import swansSoftPink from '../components/illustrations/swans_red.png';
 import './LoginPage.css';
 
 export const LoginPage: React.FC = () => {
@@ -191,9 +191,15 @@ export const LoginPage: React.FC = () => {
       {/* Centered Page Content Container */}
       <div className="page-container login-page-container">
         <div className="login-header">
-          {/* Pair of graceful, hand-drawn sketch swans based on image_22 and image_23 */}
+          {/* Pair of soft pink stippled swans */}
           <div className="login-swan-container">
-            <DoubleSwans width={125} height={78} />
+            <img
+              src={swansSoftPink}
+              alt="Pair of graceful swans"
+              className="login-swan-img"
+              width={200}
+              height={98}
+            />
           </div>
           <h2 className="login-title">Welcome to Little Hours</h2>
           <p className="login-subtitle">

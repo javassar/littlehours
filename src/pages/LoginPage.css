@@ -22,8 +22,8 @@
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  background-color: var(--surface-sunk);
-  background: var(--surface-sunk);
+  background-color: #F6EDEA;
+  background: #F6EDEA;
 }
 
 /* Parchment fiber grain texture */
@@ -156,9 +156,21 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 0px;
-  filter: drop-shadow(0 2px 8px rgba(184, 114, 127, 0.12));
+  margin-bottom: 2px;
   transition: transform var(--transition-base);
+}
+
+.login-swan-img {
+  width: 200px;
+  max-width: 85vw;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  mix-blend-mode: multiply;
+  filter: contrast(1.15) saturate(1.2);
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
 }
 
 .login-title {
