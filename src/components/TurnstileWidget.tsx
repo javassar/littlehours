@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react';
 import { RotatingSparkle } from './Sparkles';
+import './TurnstileWidget.css';
 
 declare global {
   interface Window {
@@ -13,6 +14,7 @@ declare global {
           'expired-callback'?: () => void;
           theme?: 'light' | 'dark' | 'auto';
           size?: 'normal' | 'compact' | 'flexible';
+          appearance?: 'always' | 'execute' | 'interaction-only';
         }
       ) => string;
       reset: (widgetId: string) => void;
@@ -44,6 +46,19 @@ export const TurnstileWidget = forwardRef<TurnstileWidgetRef, TurnstileWidgetPro
     const tokenRef = useRef<string | null>(null);
     const pendingResolvers = useRef<Array<(token: string | null) => void>>([]);
     const [status, setStatus] = useState<'verifying' | 'verified' | 'error'>('verifying');
+    const [isWidgetVisible, setIsWidgetVisible] = useState(false);
+
+    useEffect(() => {
+      if (!containerRef.current) return;
+      const ro = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const height = entry.contentRect.height;
+          setIsWidgetVisible(height > 20);
+        }
+      });
+      ro.observe(containerRef.current);
+      return () => ro.disconnect();
+    }, []);
 
     const siteKey =
       import.meta.env.VITE_TURNSTILE_SITE_KEY &&
@@ -131,6 +146,7 @@ export const TurnstileWidget = forwardRef<TurnstileWidgetRef, TurnstileWidgetPro
             },
             theme: 'light',
             size: 'normal',
+            appearance: 'interaction-only',
           });
 
           widgetIdRef.current = id;
@@ -194,30 +210,20 @@ export const TurnstileWidget = forwardRef<TurnstileWidgetRef, TurnstileWidgetPro
     }, [siteKey]);
 
     return (
-      <div style={{ margin: '12px 0', textAlign: 'center' }}>
+      <div
+        className="turnstile-outer-wrap"
+        style={{
+          margin: isWidgetVisible ? '14px 0' : 0,
+          textAlign: 'center',
+          transition: 'margin 0.2s ease',
+        }}
+      >
         <div
           ref={containerRef}
-          style={{
-            minHeight: 65,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
+          className={`turnstile-frame-container ${isWidgetVisible ? 'visible' : 'hidden'}`}
         />
-        {status === 'verifying' && (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
-              fontSize: 13,
-              color: 'var(--mauve)',
-              fontStyle: 'italic',
-              fontFamily: 'var(--font-body)',
-              marginTop: 4,
-            }}
-          >
+        {status === 'verifying' && isWidgetVisible && (
+          <div className="turnstile-verifying-text">
             <RotatingSparkle size={14} color="var(--gold)" />
             <span>Verifying security check...</span>
           </div>

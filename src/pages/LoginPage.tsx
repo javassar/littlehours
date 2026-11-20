@@ -247,8 +247,22 @@ export const LoginPage: React.FC = () => {
                 color: 'var(--mauve)',
               }}
             >
-              "Sample data only. Entries you type are processed by an LLM, so enter personal information according to your comfort."
+
+              Entries you type are processed by an LLM, so enter personal information according to your comfort.
             </p>
+            <p
+              style={{
+                margin: '18px 0 0 0',
+                fontSize: 12,
+                fontFamily: 'var(--font-display)',
+                fontStyle: 'italic',
+                color: 'var(--mauve)',
+                opacity: 0.8,
+                letterSpacing: '0.02em',
+              }}
+            >
+              Protected by Cloudflare           
+               </p>
           </div>
         </form>
       </Card>

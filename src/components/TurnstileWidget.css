@@ -1,0 +1,50 @@
+/* Cloudflare Turnstile widget styling */
+.turnstile-outer-wrap {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+/* Warm editorial frame matching input fields */
+.turnstile-frame-container {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.turnstile-frame-container.visible {
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(184, 114, 127, 0.25);
+  background-color: var(--surface-sunk);
+  box-shadow: inset 0 1px 2px rgba(75, 51, 64, 0.05);
+  /* Mute bright green and orange tones into warm fairy-tale editorial palette */
+  filter: sepia(0.18) saturate(0.82) contrast(0.96);
+  transition: filter var(--transition-fast), box-shadow var(--transition-fast), opacity var(--transition-fast);
+}
+
+.turnstile-frame-container.hidden {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  height: 0;
+  overflow: hidden;
+}
+
+/* Verifying status indicator */
+.turnstile-verifying-text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--mauve);
+  font-style: italic;
+  font-family: var(--font-body);
+  margin-top: 6px;
+}
