@@ -5,7 +5,7 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { generateDemoSeedData } from './data.ts';
-import starterCategories from '../_shared/starterCategories.json' with { type: 'json' };
+import demoCategories from '../_shared/demoCategories.json' with { type: 'json' };
 import { DEMO_RESETS_PER_DAY } from '../_shared/demoConfig.ts';
 
 const corsHeaders = {
@@ -160,12 +160,12 @@ Deno.serve(async (req: Request) => {
       await admin.from('entries').delete().eq('user_id', userId);
     }
 
-    // 5. Ensure caller's settings row exists with 25 categories and user timezone
+    // 5. Ensure caller's settings row exists with standardized demo categories and user timezone
     const { error: settingsErr } = await admin.from('settings').upsert(
       {
         user_id: userId,
         timezone: timeZone,
-        categories: starterCategories,
+        categories: demoCategories,
         vacation_mode: false,
         reminders_enabled: false,
       },

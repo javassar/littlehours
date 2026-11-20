@@ -1,0 +1,19 @@
+[
+  { "name": "work", "description": "Paid employment, freelance jobs, client projects, meetings, and business tasks." },
+  { "name": "study & learning", "description": "Classes, courses, tutorials, skill-building, reading for career or school, and portfolio or learning projects." },
+  { "name": "chores", "description": "Housework inside the home: cleaning, laundry, doing dishes, tidying, and home maintenance." },
+  { "name": "errands", "description": "Tasks and trips outside the home: grocery shopping, pharmacy, post office, dry cleaners, bank, and returns." },
+  { "name": "meals", "description": "Eating breakfast, lunch, dinner, snacks, and dining out alone or with others. Meal preparation is chores." },
+  { "name": "sleep", "description": "Sleeping at night, taking naps, and resting in bed trying to fall asleep." },
+  { "name": "exercise", "description": "Workouts, gym sessions, running, fitness walks, sports, yoga, and stretching." },
+  { "name": "personal care", "description": "Daily hygiene and self-care: showering, skincare, brushing teeth, grooming, haircuts, and spa treatments." },
+  { "name": "healthcare", "description": "Medical and dental appointments, therapy, taking medication, and pharmacy visits for prescriptions." },
+  { "name": "social", "description": "Time spent connecting with friends, family, or partners: visits, calls, messaging, video chats, parties, and hangouts." },
+  { "name": "entertainment", "description": "Watching TV, movies, YouTube, listening to podcasts or music, playing video games, attending concerts or shows." },
+  { "name": "screen time", "description": "Casual phone use, scrolling social media feeds, and browsing the web." },
+  { "name": "hobbies & creative", "description": "Crafts, playing an instrument, music practice, painting, creative writing, gardening, or personal creative projects." },
+  { "name": "reading", "description": "Reading books, literature, essays, or articles for leisure and pleasure." },
+  { "name": "admin", "description": "Personal logistics: paying bills, banking, taxes, filing forms, scheduling appointments, and inbox triage." },
+  { "name": "shopping", "description": "Browsing or purchasing items (clothing, household goods, online orders) other than grocery errands." },
+  { "name": "vacation", "description": "Trips, holidays, and travel away from home. Overrides ordinary daily categories while traveling." }
+]

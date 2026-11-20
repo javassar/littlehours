@@ -56,15 +56,15 @@ export const DAY_TEMPLATES: DayTemplate[] = [
         raw_text: 'woke up, showered and did morning skincare, made coffee and toast',
         painRating: 2,
         segments: [
-          { durationMinutes: 30, activity_label: 'showering and skincare', category: 'hygiene' },
-          { durationMinutes: 30, activity_label: 'breakfast', category: 'functional meals' },
+          { durationMinutes: 30, activity_label: 'showering and skincare', category: 'personal care' },
+          { durationMinutes: 30, activity_label: 'breakfast', category: 'meals' },
         ],
       },
       {
         startHour: 8, startMinute: 30, endHour: 9, endMinute: 30,
-        raw_text: 'worked on the portfolio write-up the whole hour',
+        raw_text: 'worked on course assignment and research notes',
         painRating: 2,
-        segments: [{ durationMinutes: 60, activity_label: 'portfolio write-up', category: 'professional development' }],
+        segments: [{ durationMinutes: 60, activity_label: 'coursework and research', category: 'study & learning' }],
       },
       {
         startHour: 9, startMinute: 30, endHour: 10, endMinute: 30,
@@ -86,7 +86,7 @@ export const DAY_TEMPLATES: DayTemplate[] = [
         raw_text: 'ate leftover soup for lunch while watching YouTube design videos',
         painRating: 2,
         segments: [
-          { durationMinutes: 30, activity_label: 'lunch', category: 'functional meals' },
+          { durationMinutes: 30, activity_label: 'lunch', category: 'meals' },
           { durationMinutes: 30, activity_label: 'watching design videos', category: 'entertainment' },
         ],
       },
@@ -98,9 +98,9 @@ export const DAY_TEMPLATES: DayTemplate[] = [
       },
       {
         startHour: 14, startMinute: 0, endHour: 15, endMinute: 0,
-        raw_text: 'doomscrolled on tiktok because i was avoiding the dishes',
+        raw_text: 'scrolled on my phone because i was avoiding the dishes',
         painRating: 3,
-        segments: [{ durationMinutes: 60, activity_label: 'doomscrolling in bed', category: 'doomscrolling' }],
+        segments: [{ durationMinutes: 60, activity_label: 'scrolling on phone', category: 'screen time' }],
       },
       {
         startHour: 15, startMinute: 0, endHour: 16, endMinute: 30,
@@ -118,7 +118,7 @@ export const DAY_TEMPLATES: DayTemplate[] = [
         startHour: 18, startMinute: 0, endHour: 24, endMinute: 0,
         raw_text: 'cooked pasta dinner with roommate, watched a movie, then read my novel until bedtime',
         segments: [
-          { durationMinutes: 90, activity_label: 'making dinner', category: 'functional meals', company: ['roommate'] },
+          { durationMinutes: 90, activity_label: 'making dinner', category: 'meals', company: ['roommate'] },
           { durationMinutes: 150, activity_label: 'watching a movie', category: 'entertainment', company: ['roommate'] },
           { durationMinutes: 120, activity_label: 'reading fiction', category: 'reading' },
         ],
@@ -127,7 +127,7 @@ export const DAY_TEMPLATES: DayTemplate[] = [
     standaloneRatings: [{ hour: 13, minute: 30, rating: 3 }],
   },
 
-  // Day -5 (Weekday A2: Job search, errands, piano practice, texting)
+  // Day -5 (Weekday A2: Work, errands, creative hobby, social)
   {
     name: 'Weekday A2',
     entries: [
@@ -142,20 +142,20 @@ export const DAY_TEMPLATES: DayTemplate[] = [
         painRating: 2,
         segments: [
           { durationMinutes: 25, activity_label: 'morning stretching', category: 'exercise' },
-          { durationMinutes: 35, activity_label: 'breakfast', category: 'functional meals' },
+          { durationMinutes: 35, activity_label: 'breakfast', category: 'meals' },
         ],
       },
       {
         startHour: 8, startMinute: 0, endHour: 9, endMinute: 30,
-        raw_text: 'tailored resume and submitted two design applications',
+        raw_text: 'tailored resume and submitted two project applications',
         painRating: 2,
-        segments: [{ durationMinutes: 90, activity_label: 'submitting job applications', category: 'job search' }],
+        segments: [{ durationMinutes: 90, activity_label: 'submitting applications', category: 'work' }],
       },
       {
         startHour: 9, startMinute: 30, endHour: 10, endMinute: 30,
-        raw_text: 'informational coffee chat on zoom with Dana about UX roles',
+        raw_text: 'coffee chat on zoom with Dana about career plans',
         painRating: 2,
-        segments: [{ durationMinutes: 60, activity_label: 'career coffee chat', category: 'networking', company: ['Dana'] }],
+        segments: [{ durationMinutes: 60, activity_label: 'career coffee chat', category: 'social', company: ['Dana'] }],
       },
       {
         startHour: 10, startMinute: 30, endHour: 12, endMinute: 0,
@@ -170,35 +170,35 @@ export const DAY_TEMPLATES: DayTemplate[] = [
         startHour: 12, startMinute: 0, endHour: 13, endMinute: 0,
         raw_text: 'unpacked groceries and made a warm turkey sandwich for lunch',
         painRating: 2,
-        segments: [{ durationMinutes: 60, activity_label: 'lunch', category: 'functional meals' }],
+        segments: [{ durationMinutes: 60, activity_label: 'lunch', category: 'meals' }],
       },
       {
         startHour: 13, startMinute: 0, endHour: 15, endMinute: 0,
-        raw_text: 'contract work on user interview synthesis and presentation deck',
+        raw_text: 'client work on project synthesis and presentation deck',
         painRating: 3,
-        segments: [{ durationMinutes: 120, activity_label: 'contract design work', category: 'work' }],
+        segments: [{ durationMinutes: 120, activity_label: 'client project work', category: 'work' }],
       },
       {
         startHour: 15, startMinute: 0, endHour: 16, endMinute: 0,
-        raw_text: 'scrolled pinterest for outfit and pottery ideas',
+        raw_text: 'browsed online feeds for design ideas and recipes',
         painRating: 2,
-        segments: [{ durationMinutes: 60, activity_label: 'browsing pinterest', category: 'social media' }],
+        segments: [{ durationMinutes: 60, activity_label: 'browsing online feeds', category: 'screen time' }],
       },
       {
         startHour: 16, startMinute: 0, endHour: 17, endMinute: 0,
-        raw_text: 'piano practice for 40 minutes, then texted my roommate',
+        raw_text: 'practiced acoustic guitar for 40 minutes, then texted my roommate',
         painRating: 2,
         segments: [
-          { durationMinutes: 40, activity_label: 'piano scales and piece', category: 'piano' },
-          { durationMinutes: 20, activity_label: 'texting about groceries', category: 'texting', company: ['roommate'] },
+          { durationMinutes: 40, activity_label: 'guitar practice', category: 'hobbies & creative' },
+          { durationMinutes: 20, activity_label: 'texting about groceries', category: 'social', company: ['roommate'] },
         ],
       },
       {
         startHour: 17, startMinute: 0, endHour: 24, endMinute: 0,
         raw_text: 'dinner at home, watercolor painting in my sketchbook, and reading before bed',
         segments: [
-          { durationMinutes: 60, activity_label: 'dinner', category: 'functional meals' },
-          { durationMinutes: 180, activity_label: 'watercolor painting', category: 'hobbies' },
+          { durationMinutes: 60, activity_label: 'dinner', category: 'meals' },
+          { durationMinutes: 180, activity_label: 'watercolor painting', category: 'hobbies & creative' },
           { durationMinutes: 180, activity_label: 'reading', category: 'reading' },
         ],
       },
@@ -268,7 +268,7 @@ export const DAY_TEMPLATES: DayTemplate[] = [
     standaloneRatings: [{ hour: 15, minute: 0, rating: 2 }],
   },
 
-  // Day -3 (Weekday A3: Work, physical therapy healthcare, shopping, texting)
+  // Day -3 (Weekday A3: Work, healthcare, shopping, learning)
   {
     name: 'Weekday A3',
     entries: [
@@ -282,8 +282,8 @@ export const DAY_TEMPLATES: DayTemplate[] = [
         raw_text: 'morning coffee and toast, quick shower and got dressed',
         painRating: 2,
         segments: [
-          { durationMinutes: 30, activity_label: 'breakfast', category: 'functional meals' },
-          { durationMinutes: 30, activity_label: 'getting ready', category: 'hygiene' },
+          { durationMinutes: 30, activity_label: 'breakfast', category: 'meals' },
+          { durationMinutes: 30, activity_label: 'getting ready', category: 'personal care' },
         ],
       },
       {
@@ -307,8 +307,8 @@ export const DAY_TEMPLATES: DayTemplate[] = [
         raw_text: 'made a big salad for lunch and caught up on messages with Dana',
         painRating: 2,
         segments: [
-          { durationMinutes: 30, activity_label: 'lunch', category: 'functional meals' },
-          { durationMinutes: 30, activity_label: 'texting Dana', category: 'texting', company: ['Dana'] },
+          { durationMinutes: 30, activity_label: 'lunch', category: 'meals' },
+          { durationMinutes: 30, activity_label: 'chatting with Dana', category: 'social', company: ['Dana'] },
         ],
       },
       {
@@ -325,23 +325,23 @@ export const DAY_TEMPLATES: DayTemplate[] = [
       },
       {
         startHour: 15, startMinute: 30, endHour: 17, endMinute: 0,
-        raw_text: 'worked through an online typography course and took notes',
+        raw_text: 'worked through an online design course and took notes',
         painRating: 2,
-        segments: [{ durationMinutes: 90, activity_label: 'typography course', category: 'professional development' }],
+        segments: [{ durationMinutes: 90, activity_label: 'online design course', category: 'study & learning' }],
       },
       {
         startHour: 17, startMinute: 0, endHour: 24, endMinute: 0,
         raw_text: 'made stir fry for dinner, knitted while listening to an audiobook, went to sleep',
         segments: [
-          { durationMinutes: 60, activity_label: 'cooking dinner', category: 'functional meals' },
-          { durationMinutes: 120, activity_label: 'knitting sweater', category: 'hobbies' },
+          { durationMinutes: 60, activity_label: 'cooking dinner', category: 'meals' },
+          { durationMinutes: 120, activity_label: 'knitting sweater', category: 'hobbies & creative' },
           { durationMinutes: 240, activity_label: 'reading audiobook', category: 'reading' },
         ],
       },
     ],
   },
 
-  // Day -2 (Weekend B1: Saturday with Event - Ballet with Priya and Sam)
+  // Day -2 (Weekend B1: Saturday with Event - Concert with Priya and Sam)
   {
     name: 'Weekend Event B1',
     entries: [
@@ -352,11 +352,11 @@ export const DAY_TEMPLATES: DayTemplate[] = [
       },
       {
         startHour: 8, startMinute: 0, endHour: 9, endMinute: 30,
-        raw_text: 'lazy morning coffee, scrolled bereal and pinterest in bed',
+        raw_text: 'lazy morning coffee, scrolled news and social media in bed',
         painRating: 2,
         segments: [
-          { durationMinutes: 45, activity_label: 'breakfast in bed', category: 'functional meals' },
-          { durationMinutes: 45, activity_label: 'browsing social media', category: 'social media' },
+          { durationMinutes: 45, activity_label: 'breakfast in bed', category: 'meals' },
+          { durationMinutes: 45, activity_label: 'browsing social media', category: 'screen time' },
         ],
       },
       {
@@ -367,43 +367,43 @@ export const DAY_TEMPLATES: DayTemplate[] = [
       },
       {
         startHour: 11, startMinute: 0, endHour: 12, endMinute: 30,
-        raw_text: 'piano practice working on Chopin nocturne',
+        raw_text: 'acoustic guitar practice and worked on new chords',
         painRating: 2,
-        segments: [{ durationMinutes: 90, activity_label: 'piano practice', category: 'piano' }],
+        segments: [{ durationMinutes: 90, activity_label: 'guitar practice', category: 'hobbies & creative' }],
       },
       {
         startHour: 12, startMinute: 30, endHour: 14, endMinute: 0,
         raw_text: 'met Dana for lunch at the bakery patio and talked about books',
         painRating: 2,
-        segments: [{ durationMinutes: 90, activity_label: 'bakery lunch', category: 'social meals', company: ['Dana'] }],
+        segments: [{ durationMinutes: 90, activity_label: 'bakery lunch', category: 'meals', company: ['Dana'] }],
       },
       {
         startHour: 14, startMinute: 0, endHour: 16, endMinute: 0,
-        raw_text: 'hair wash, manicure, and got dressed up in my velvet dress for the ballet',
+        raw_text: 'hair wash, got ready and dressed up for evening concert',
         painRating: 2,
-        segments: [{ durationMinutes: 120, activity_label: 'hair and getting dressed', category: 'personal care' }],
+        segments: [{ durationMinutes: 120, activity_label: 'getting ready and styling', category: 'personal care' }],
       },
       {
         startHour: 16, startMinute: 0, endHour: 19, endMinute: 30,
-        raw_text: 'ballet with Priya and Sam at the performing arts center',
+        raw_text: 'concert with Priya and Sam at the music hall',
         painRating: 3,
         segments: [
-          { durationMinutes: 30, activity_label: 'travel to theater', category: 'events', company: ['Priya', 'Sam'] },
-          { durationMinutes: 180, activity_label: 'ballet performance', category: 'events', company: ['Priya', 'Sam'] },
+          { durationMinutes: 30, activity_label: 'travel to venue', category: 'entertainment', company: ['Priya', 'Sam'] },
+          { durationMinutes: 180, activity_label: 'live concert performance', category: 'entertainment', company: ['Priya', 'Sam'] },
         ],
       },
       {
         startHour: 19, startMinute: 30, endHour: 22, endMinute: 0,
-        raw_text: 'late dinner and dessert with Priya and Sam celebrating the show',
+        raw_text: 'late dinner and dessert with Priya and Sam after the concert',
         painRating: 2,
-        segments: [{ durationMinutes: 150, activity_label: 'post-show dinner', category: 'social meals', company: ['Priya', 'Sam'] }],
+        segments: [{ durationMinutes: 150, activity_label: 'post-concert dinner', category: 'meals', company: ['Priya', 'Sam'] }],
       },
       {
         startHour: 22, startMinute: 0, endHour: 24, endMinute: 0,
         raw_text: 'got home, washed face and got ready for bed',
         segments: [
-          { durationMinutes: 30, activity_label: 'travel home from show', category: 'events' },
-          { durationMinutes: 90, activity_label: 'night routine', category: 'hygiene' },
+          { durationMinutes: 30, activity_label: 'travel home from concert', category: 'entertainment' },
+          { durationMinutes: 90, activity_label: 'night routine', category: 'personal care' },
         ],
       },
     ],
@@ -423,7 +423,7 @@ export const DAY_TEMPLATES: DayTemplate[] = [
         startHour: 8, startMinute: 30, endHour: 9, endMinute: 30,
         raw_text: 'made french toast and tea with roommate',
         painRating: 2,
-        segments: [{ durationMinutes: 60, activity_label: 'sunday breakfast', category: 'functional meals', company: ['roommate'] }],
+        segments: [{ durationMinutes: 60, activity_label: 'sunday breakfast', category: 'meals', company: ['roommate'] }],
       },
       {
         startHour: 9, startMinute: 30, endHour: 11, endMinute: 30,
@@ -431,21 +431,21 @@ export const DAY_TEMPLATES: DayTemplate[] = [
         painRating: 2,
         segments: [
           { durationMinutes: 60, activity_label: 'farmers market stroll', category: 'errands', company: ['Sam'] },
-          { durationMinutes: 60, activity_label: 'coffee stand hangout', category: 'social time', company: ['Sam'] },
+          { durationMinutes: 60, activity_label: 'coffee stand hangout', category: 'social', company: ['Sam'] },
         ],
       },
       {
         startHour: 11, startMinute: 30, endHour: 13, endMinute: 0,
         raw_text: 'gardening on the back patio and repotted houseplants',
         painRating: 3,
-        segments: [{ durationMinutes: 90, activity_label: 'plant repotting and gardening', category: 'hobbies' }],
+        segments: [{ durationMinutes: 90, activity_label: 'plant repotting and gardening', category: 'hobbies & creative' }],
       },
       {
         startHour: 13, startMinute: 0, endHour: 14, endMinute: 30,
         raw_text: 'sunday lunch and organized weekly planner and schedule',
         painRating: 2,
         segments: [
-          { durationMinutes: 45, activity_label: 'lunch', category: 'functional meals' },
+          { durationMinutes: 45, activity_label: 'lunch', category: 'meals' },
           { durationMinutes: 45, activity_label: 'weekly planning', category: 'admin' },
         ],
       },
@@ -465,8 +465,8 @@ export const DAY_TEMPLATES: DayTemplate[] = [
         startHour: 17, startMinute: 30, endHour: 24, endMinute: 0,
         raw_text: 'cooked dinner, called Dana to catch up, watched a series with roommate, went to bed',
         segments: [
-          { durationMinutes: 60, activity_label: 'cooking dinner', category: 'functional meals' },
-          { durationMinutes: 60, activity_label: 'phone call with Dana', category: 'social time', company: ['Dana'] },
+          { durationMinutes: 60, activity_label: 'cooking dinner', category: 'meals' },
+          { durationMinutes: 60, activity_label: 'phone call with Dana', category: 'social', company: ['Dana'] },
           { durationMinutes: 120, activity_label: 'watching tv series', category: 'entertainment', company: ['roommate'] },
           { durationMinutes: 150, activity_label: 'lying down trying to sleep', category: 'sleep' },
         ],
@@ -488,15 +488,15 @@ export const TODAY_ENTRY_BLUEPRINTS: SeedEntryTemplate[] = [
     raw_text: 'woke up, morning shower, brewed coffee and scrambled eggs',
     painRating: 2,
     segments: [
-      { durationMinutes: 30, activity_label: 'shower and routine', category: 'hygiene' },
-      { durationMinutes: 30, activity_label: 'breakfast', category: 'functional meals' },
+      { durationMinutes: 30, activity_label: 'shower and routine', category: 'personal care' },
+      { durationMinutes: 30, activity_label: 'breakfast', category: 'meals' },
     ],
   },
   {
     startHour: 8, startMinute: 15, endHour: 9, endMinute: 30,
-    raw_text: 'reviewed portfolio feedback and updated case study intro',
+    raw_text: 'reviewed course materials and updated presentation slides',
     painRating: 2,
-    segments: [{ durationMinutes: 75, activity_label: 'portfolio case study', category: 'professional development' }],
+    segments: [{ durationMinutes: 75, activity_label: 'course study and notes', category: 'study & learning' }],
   },
   {
     startHour: 9, startMinute: 30, endHour: 10, endMinute: 30,
@@ -514,13 +514,13 @@ export const TODAY_ENTRY_BLUEPRINTS: SeedEntryTemplate[] = [
     startHour: 11, startMinute: 45, endHour: 12, endMinute: 45,
     raw_text: 'made avocado toast and tomato soup for lunch with roommate',
     painRating: 2,
-    segments: [{ durationMinutes: 60, activity_label: 'lunch with roommate', category: 'functional meals', company: ['roommate'] }],
+    segments: [{ durationMinutes: 60, activity_label: 'lunch with roommate', category: 'meals', company: ['roommate'] }],
   },
   {
     startHour: 12, startMinute: 45, endHour: 14, endMinute: 0,
-    raw_text: 'doomscrolled in bed on tiktok before getting back to desk',
+    raw_text: 'scrolled through feeds on phone before getting back to desk',
     painRating: 3,
-    segments: [{ durationMinutes: 75, activity_label: 'doomscrolling', category: 'doomscrolling' }],
+    segments: [{ durationMinutes: 75, activity_label: 'scrolling on phone', category: 'screen time' }],
   },
   {
     startHour: 14, startMinute: 0, endHour: 15, endMinute: 30,
@@ -530,11 +530,11 @@ export const TODAY_ENTRY_BLUEPRINTS: SeedEntryTemplate[] = [
   },
   {
     startHour: 15, startMinute: 30, endHour: 17, endMinute: 0,
-    raw_text: 'practiced piano sonata for 45 minutes then texted Sam about dinner plans',
+    raw_text: 'practiced acoustic guitar for 45 minutes then texted Sam about dinner plans',
     painRating: 2,
     segments: [
-      { durationMinutes: 45, activity_label: 'piano practice', category: 'piano' },
-      { durationMinutes: 45, activity_label: 'texting Sam', category: 'texting', company: ['Sam'] },
+      { durationMinutes: 45, activity_label: 'guitar practice', category: 'hobbies & creative' },
+      { durationMinutes: 45, activity_label: 'texting Sam', category: 'social', company: ['Sam'] },
     ],
   },
   {
@@ -548,7 +548,7 @@ export const TODAY_ENTRY_BLUEPRINTS: SeedEntryTemplate[] = [
     raw_text: 'dinner and tea at home while reading articles',
     painRating: 2,
     segments: [
-      { durationMinutes: 45, activity_label: 'dinner', category: 'functional meals' },
+      { durationMinutes: 45, activity_label: 'dinner', category: 'meals' },
       { durationMinutes: 45, activity_label: 'reading articles', category: 'reading' },
     ],
   },
