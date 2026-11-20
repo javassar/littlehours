@@ -428,6 +428,7 @@
   flex-shrink: 0;
   min-width: 0;
   box-sizing: border-box;
+  overflow: visible;
 }
 
 /* Company chips & input (Milestone 3.7) */

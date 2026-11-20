@@ -26,6 +26,7 @@ import { OverlapAdjustmentsPayload } from '../lib/overlap';
 import { DEMO_MAX_TEXT_CHARS } from '../lib/demoConfig';
 
 const DRAFT_STORAGE_KEY = 'littlehours_draft_entry';
+const SPARKLE_BURST_DURATION_MS = 1500;
 
 interface LastEntrySummary {
   window_start: string;
@@ -361,7 +362,7 @@ export const LogPage: React.FC = () => {
         setToastMessage('Saved rating (waiting to sync)');
         setSparkleActive(true);
         setToastVisible(true);
-        setTimeout(() => setSparkleActive(false), 700);
+        setTimeout(() => setSparkleActive(false), SPARKLE_BURST_DURATION_MS);
         setIsSaving(false);
         return;
       }
@@ -390,7 +391,7 @@ export const LogPage: React.FC = () => {
         setCustomRatedAt(null);
         setSparkleActive(true);
         setToastVisible(true);
-        setTimeout(() => setSparkleActive(false), 700);
+        setTimeout(() => setSparkleActive(false), SPARKLE_BURST_DURATION_MS);
       } catch {
         await enqueueRating(ratingPayload);
         setPainRating(null);
@@ -398,7 +399,7 @@ export const LogPage: React.FC = () => {
         setToastMessage('Saved rating (waiting to sync)');
         setSparkleActive(true);
         setToastVisible(true);
-        setTimeout(() => setSparkleActive(false), 700);
+        setTimeout(() => setSparkleActive(false), SPARKLE_BURST_DURATION_MS);
       } finally {
         setIsSaving(false);
       }
@@ -469,7 +470,7 @@ export const LogPage: React.FC = () => {
 
       setTimeout(() => {
         setSparkleActive(false);
-      }, 700);
+      }, SPARKLE_BURST_DURATION_MS);
 
       setTimeout(() => {
         textareaRef.current?.focus();

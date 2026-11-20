@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from './Button';
 import { Chip } from './Chip';
 import { Sparkle } from './illustrations/Sparkle';
+import { SparkleBurst } from './Sparkles';
 import { ModalPortal } from './ModalPortal';
 import { SegmentItem } from './EntryEditSheet';
 import {
@@ -49,6 +50,7 @@ export const ConfirmationSheet: React.FC<ConfirmationSheetProps> = ({
   const [segments, setSegments] = useState<SegmentItem[]>([]);
   const [companyInputs, setCompanyInputs] = useState<Record<number, string>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [sparkleActive, setSparkleActive] = useState(false);
 
   const categoryNames = useMemo(() => {
     return categories.map((c) => (typeof c === 'string' ? c : c.name));
@@ -284,12 +286,20 @@ export const ConfirmationSheet: React.FC<ConfirmationSheetProps> = ({
 
   // 6. "Looks right" sets confirmed = true and saves
   const handleLooksRight = async () => {
+    setSparkleActive(true);
     setIsSaving(true);
+    const sparkleTimer = setTimeout(() => setSparkleActive(false), 1500);
     try {
       const confirmedSegments = segments.map((s) => ({ ...s, confirmed: true }));
-      await onConfirm(confirmedSegments, overlapResult.payload);
+      await Promise.all([
+        onConfirm(confirmedSegments, overlapResult.payload),
+        new Promise((resolve) => setTimeout(resolve, 850)),
+      ]);
       onClose();
+    } catch {
+      setSparkleActive(false);
     } finally {
+      clearTimeout(sparkleTimer);
       setIsSaving(false);
     }
   };
@@ -563,14 +573,17 @@ export const ConfirmationSheet: React.FC<ConfirmationSheetProps> = ({
 
         {/* Footer actions */}
         <div className="confirmation-sheet-footer">
-          <Button
-            variant="primary"
-            fullWidth
-            onClick={handleLooksRight}
-            disabled={isSaving}
-          >
-            {isSaving ? 'Saving...' : 'Looks right'}
-          </Button>
+          <div style={{ position: 'relative', width: '100%' }}>
+            <Button
+              variant="primary"
+              fullWidth
+              onClick={handleLooksRight}
+              disabled={isSaving}
+            >
+              {isSaving ? 'Saving...' : 'Looks right'}
+            </Button>
+            <SparkleBurst active={sparkleActive} />
+          </div>
           <Button
             variant="secondary"
             fullWidth

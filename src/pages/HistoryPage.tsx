@@ -15,7 +15,7 @@ import {
   Chip,
   RatingEditSheet,
   RatingItem,
-  ModalPortal,
+  ConfirmModal,
 } from '../components';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
@@ -1200,48 +1200,24 @@ export const HistoryPage: React.FC = () => {
       </div>
 
       {/* Direct Card Delete Confirmation Dialog */}
-      {entryToDelete && (
-        <ModalPortal>
-          <div
-            className="sheet-backdrop"
-            onClick={() => setEntryToDelete(null)}
-            role="dialog"
-            aria-modal="true"
-          >
-            <div
-              className="sheet-surface"
-              onClick={(e) => e.stopPropagation()}
-              style={{ width: '100%', maxWidth: 360, textAlign: 'center', borderRadius: 24, padding: '24px 20px' }}
-            >
-              <div className="entry-delete-confirm-box" style={{ margin: 0 }}>
-                <p className="entry-delete-confirm-text">Delete this entry?</p>
-                <p className="entry-delete-confirm-sub">This action cannot be undone.</p>
-                <div className="sheet-button-row">
-                  <Button
-                    variant="secondary"
-                    disabled={isDeletingDirect}
-                    onClick={() => setEntryToDelete(null)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    disabled={isDeletingDirect}
-                    onClick={async () => {
-                      setIsDeletingDirect(true);
-                      await handleDeleteEntry(entryToDelete.id);
-                      setIsDeletingDirect(false);
-                      setEntryToDelete(null);
-                    }}
-                  >
-                    {isDeletingDirect ? 'Deleting...' : 'Delete'}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </ModalPortal>
-      )}
+      <ConfirmModal
+        isOpen={!!entryToDelete}
+        title="Delete this entry?"
+        message="This action cannot be undone."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        isDestructive={true}
+        isLoading={isDeletingDirect}
+        loadingLabel="Deleting..."
+        onConfirm={async () => {
+          if (!entryToDelete) return;
+          setIsDeletingDirect(true);
+          await handleDeleteEntry(entryToDelete.id);
+          setIsDeletingDirect(false);
+          setEntryToDelete(null);
+        }}
+        onCancel={() => setEntryToDelete(null)}
+      />
 
       {/* Confirmation sheet for segments (Milestone 2.3) */}
       <ConfirmationSheet

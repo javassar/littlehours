@@ -247,7 +247,7 @@ export const LoginPage: React.FC = () => {
                 color: 'var(--mauve)',
               }}
             >
-              Sample data only. Entries you type are read by an AI service, so please do not enter personal information.
+              "Sample data only. Entries you type are processed by an LLM, so enter personal information according to your comfort."
             </p>
           </div>
         </form>

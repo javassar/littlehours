@@ -1,0 +1,159 @@
+/* Backdrop - blurred dark overlay cleanly centering modal in viewport */
+.confirm-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(75, 51, 64, 0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 2500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  box-sizing: border-box;
+  animation: confirmBackdropFadeIn var(--transition-fast) forwards;
+}
+
+@keyframes confirmBackdropFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Modal Card - solid, opaque cream surface, rounded corners, soft shadow */
+.confirm-modal-card {
+  width: 100%;
+  max-width: 360px;
+  min-width: 0;
+  background-color: var(--surface); /* Solid opaque cream #FBF6F3 */
+  border-radius: 24px;
+  padding: 28px 24px 24px 24px;
+  border: 1px solid rgba(184, 114, 127, 0.25);
+  box-shadow: 0 12px 40px rgba(75, 51, 64, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  text-align: center;
+  box-sizing: border-box;
+  animation: confirmModalPop var(--transition-fast) forwards;
+}
+
+@keyframes confirmModalPop {
+  from {
+    opacity: 0;
+    transform: scale(0.93) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Heading: Serif, high-contrast dark espresso/plum text */
+.confirm-modal-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 24px;
+  line-height: 1.25;
+  color: var(--ink); /* Dark plum/espresso #4B3340 */
+  margin: 0 0 10px 0;
+}
+
+/* Subtitle: Serif, legible muted plum/taupe */
+.confirm-modal-message {
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--mauve); /* Muted plum/taupe #8E6B7A */
+  margin: 0 0 24px 0;
+}
+
+/* Actions: Pill-shaped buttons with solid fills */
+.confirm-modal-actions {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.confirm-modal-btn {
+  flex: 1;
+  min-width: 0;
+  height: 48px;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  border-radius: 999px;
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), transform 100ms ease, box-shadow var(--transition-fast);
+  box-sizing: border-box;
+  text-decoration: none;
+}
+
+.confirm-modal-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Cancel: Solid cream/off-white fill with 1.5px dusty-rose border & dark plum text */
+.confirm-modal-btn-cancel {
+  background-color: var(--surface);
+  border: 1.5px solid var(--rose-deep);
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgba(75, 51, 64, 0.08);
+}
+
+.confirm-modal-btn-cancel:hover:not(:disabled) {
+  background-color: rgba(217, 165, 174, 0.15);
+}
+
+.confirm-modal-btn-cancel:active:not(:disabled) {
+  background-color: rgba(217, 165, 174, 0.25);
+  transform: translateY(1px);
+}
+
+/* Destructive Exit Demo: Solid deep rose/crimson with crisp off-white text */
+.confirm-modal-btn-destructive {
+  background-color: var(--danger);
+  border: 1.5px solid var(--danger);
+  color: #FFFDFB;
+  box-shadow: 0 4px 14px rgba(168, 80, 94, 0.28);
+}
+
+.confirm-modal-btn-destructive:hover:not(:disabled) {
+  background-color: #964250;
+  border-color: #964250;
+}
+
+.confirm-modal-btn-destructive:active:not(:disabled) {
+  background-color: #7f3441;
+  border-color: #7f3441;
+  transform: translateY(1px);
+}
+
+/* Primary confirm: Solid dusty-rose fill with dark plum text (matches "Looks right") */
+.confirm-modal-btn-primary {
+  background-color: var(--rose);
+  border: 1.5px solid var(--rose);
+  color: var(--ink);
+  box-shadow: var(--shadow-rose);
+}
+
+.confirm-modal-btn-primary:hover:not(:disabled) {
+  background-color: #d39aa4;
+}
+
+.confirm-modal-btn-primary:active:not(:disabled) {
+  background-color: var(--rose-deep);
+  color: #fffaf9;
+  transform: translateY(1px);
+}

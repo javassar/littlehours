@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Button, Hummingbird, Chip, Toast, CategoriesSheet, PeopleSheet, ModalPortal } from '../components';
+import { Card, Button, Hummingbird, Chip, Toast, CategoriesSheet, PeopleSheet, ConfirmModal } from '../components';
 import { DEMO_RESETS_PER_DAY } from '../lib/demoConfig';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
@@ -1485,100 +1485,32 @@ export const SettingsPage: React.FC = () => {
       )}
 
       {/* Confirmation modal for Reset Sample Data */}
-      {showResetConfirm && (
-        <ModalPortal>
-          <div
-            className="sheet-backdrop"
-            style={{ zIndex: 1000 }}
-            onClick={() => !isResetting && setShowResetConfirm(false)}
-          >
-            <div
-              className="sheet-content confirmation-sheet-content"
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                width: '100%',
-                maxWidth: 360,
-                textAlign: 'center',
-                borderRadius: 24,
-                padding: '24px 20px',
-              }}
-            >
-              <div className="entry-delete-confirm-box" style={{ margin: 0 }}>
-                <p className="entry-delete-confirm-text" style={{ fontSize: 18, marginBottom: 8 }}>
-                  Reset sample data?
-                </p>
-                <p className="entry-delete-confirm-sub" style={{ fontSize: 14, marginBottom: 20 }}>
-                  Your changes will be replaced with fresh sample data.
-                </p>
-                <div className="sheet-button-row">
-                  <Button
-                    variant="secondary"
-                    disabled={isResetting}
-                    onClick={() => setShowResetConfirm(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    disabled={isResetting}
-                    onClick={handleResetSampleData}
-                  >
-                    {isResetting ? 'Resetting...' : 'Reset'}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </ModalPortal>
-      )}
+      <ConfirmModal
+        isOpen={showResetConfirm}
+        title="Reset sample data?"
+        message="Your changes will be replaced with fresh sample data."
+        confirmLabel="Reset"
+        cancelLabel="Cancel"
+        isDestructive={true}
+        isLoading={isResetting}
+        loadingLabel="Resetting..."
+        onConfirm={handleResetSampleData}
+        onCancel={() => setShowResetConfirm(false)}
+      />
 
       {/* Confirmation modal for Exit Demo */}
-      {showExitConfirm && (
-        <ModalPortal>
-          <div
-            className="sheet-backdrop"
-            style={{ zIndex: 1000 }}
-            onClick={() => !isExiting && setShowExitConfirm(false)}
-          >
-            <div
-              className="sheet-content confirmation-sheet-content"
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                width: '100%',
-                maxWidth: 360,
-                textAlign: 'center',
-                borderRadius: 24,
-                padding: '24px 20px',
-              }}
-            >
-              <div className="entry-delete-confirm-box" style={{ margin: 0 }}>
-                <p className="entry-delete-confirm-text" style={{ fontSize: 18, marginBottom: 8 }}>
-                  Exit the demo?
-                </p>
-                <p className="entry-delete-confirm-sub" style={{ fontSize: 14, marginBottom: 20 }}>
-                  Your sandbox will be deleted.
-                </p>
-                <div className="sheet-button-row">
-                  <Button
-                    variant="secondary"
-                    disabled={isExiting}
-                    onClick={() => setShowExitConfirm(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    disabled={isExiting}
-                    onClick={handleExitDemo}
-                  >
-                    {isExiting ? 'Exiting...' : 'Exit demo'}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </ModalPortal>
-      )}
+      <ConfirmModal
+        isOpen={showExitConfirm}
+        title="Exit the demo?"
+        message="Your sandbox will be deleted."
+        confirmLabel="Exit demo"
+        cancelLabel="Cancel"
+        isDestructive={true}
+        isLoading={isExiting}
+        loadingLabel="Exiting..."
+        onConfirm={handleExitDemo}
+        onCancel={() => setShowExitConfirm(false)}
+      />
 
       <div style={{ marginTop: 24, textAlign: 'center' }}>
         <Button variant="secondary" onClick={() => navigate('/design')}>

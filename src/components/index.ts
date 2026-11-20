@@ -20,4 +20,5 @@ export * from './InstallBanner';
 export * from './DemoBanner';
 export * from './TurnstileWidget';
 export * from './ModalPortal';
+export * from './ConfirmModal';
 export * from './illustrations';

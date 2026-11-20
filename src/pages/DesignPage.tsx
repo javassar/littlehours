@@ -46,7 +46,7 @@ export const DesignPage: React.FC = () => {
     setToastVisible(true);
     setTimeout(() => {
       setSparkleActive(false);
-    }, 700);
+    }, 1500);
   };
 
   return (

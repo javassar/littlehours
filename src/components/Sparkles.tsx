@@ -8,6 +8,8 @@ export interface SparkleBurstProps {
   className?: string;
 }
 
+const SPARKLE_SIZES = [18, 14, 19, 15, 14, 14, 12, 13];
+
 export const SparkleBurst: React.FC<SparkleBurstProps> = ({
   active,
   onAnimationEnd,
@@ -15,16 +17,16 @@ export const SparkleBurst: React.FC<SparkleBurstProps> = ({
 }) => {
   if (!active) return null;
 
-  // Six sparkles with defined relative offsets and animations
+  // 8 celebratory confetti sparkles with parabolic fountain trajectories and spin
   return (
     <div
       className={`sparkle-burst ${className}`}
       onAnimationEnd={onAnimationEnd}
       aria-hidden="true"
     >
-      {[0, 1, 2, 3, 4, 5].map((i) => (
+      {SPARKLE_SIZES.map((size, i) => (
         <span key={i} className={`sparkle-item sparkle-item-${i}`}>
-          <Sparkle size={i % 2 === 0 ? 14 : 10} color="var(--gold)" />
+          <Sparkle size={size} color="var(--gold)" />
         </span>
       ))}
     </div>
