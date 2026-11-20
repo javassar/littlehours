@@ -10,13 +10,13 @@ Little Hours is an offline-first progressive web app for logging daily activitie
 
 <!-- Add your screenshots to docs/screenshots/ and update the paths below -->
 
-| Log Screen | History & Segments | Segment Confirmation |
-| :---: | :---: | :---: |
-| ![Log Screen](docs/screenshots/log.png) | ![History](docs/screenshots/history.png) | ![Confirmation](docs/screenshots/confirmation.png) |
+| Login Screen | Log Screen | Pain Rating Guide
+| :---: | :---: | :---: | :---: |
+| ![Login Screen](docs/screenshots/login.png) | ![Log Screen](docs/screenshots/log.png)| ![Pain Guide](docs/screenshots/pain-guide.png)
 
-| Pain Rating Guide | Category Management | Analytics & Export |
+| Segment Confirmation | History & Segments (Demo Mode) | Settings  
 | :---: | :---: | :---: |
-| ![Pain Guide](docs/screenshots/pain-guide.png) | ![Categories](docs/screenshots/categories.png) | ![Export](docs/screenshots/export.png) |
+| ![Confirmation](docs/screenshots/confirmation.png) | ![History (Demo Mode)](docs/screenshots/history_demo.png) | ![Settings](docs/screenshots/settings.png) |
 
 ---
 
