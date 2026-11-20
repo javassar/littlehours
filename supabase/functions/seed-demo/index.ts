@@ -79,6 +79,8 @@ Deno.serve(async (req: Request) => {
     // 3. Admin client with service_role to read/write demo data safely
     const admin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
+    let currentResets = 0;
+
     // 3b. Query remaining resets for today
     if (body.get_resets) {
       const todayDate = new Date().toISOString().split('T')[0];
@@ -101,7 +103,6 @@ Deno.serve(async (req: Request) => {
     }
 
     // 4. Idempotency check: if reset is false and user already has entries, return seeded: false
-    let currentResets = 0;
     if (!isReset) {
       const { count, error: countErr } = await admin
         .from('entries')
@@ -160,25 +161,34 @@ Deno.serve(async (req: Request) => {
     }
 
     // 5. Ensure caller's settings row exists with 25 categories and user timezone
-    await admin.from('settings').upsert(
+    const { error: settingsErr } = await admin.from('settings').upsert(
       {
         user_id: userId,
         timezone: timeZone,
         categories: starterCategories,
         vacation_mode: false,
         reminders_enabled: false,
-        updated_at: new Date().toISOString(),
       },
       { onConflict: 'user_id' }
     );
+    if (settingsErr) {
+      console.error('[seed-demo] settings upsert error:', settingsErr);
+      throw new Error(`Failed to save settings: ${settingsErr.message}`);
+    }
 
     // 6. Generate 7 days of realistic seed data
     const seed = generateDemoSeedData(userId, timeZone, new Date());
 
     // 7. Insert entries, segments, and pain_ratings in batches
     if (seed.entries.length > 0) {
-      const { error: entErr } = await admin.from('entries').insert(seed.entries);
-      if (entErr) throw new Error(`Failed to insert seed entries: ${entErr.message}`);
+      for (let i = 0; i < seed.entries.length; i += 25) {
+        const chunk = seed.entries.slice(i, i + 25);
+        const { error: entErr } = await admin.from('entries').insert(chunk);
+        if (entErr) {
+          console.error('[seed-demo] entries insert error:', entErr);
+          throw new Error(`Failed to insert seed entries: ${entErr.message}`);
+        }
+      }
     }
 
     if (seed.segments.length > 0) {
@@ -186,7 +196,10 @@ Deno.serve(async (req: Request) => {
       for (let i = 0; i < seed.segments.length; i += 50) {
         const chunk = seed.segments.slice(i, i + 50);
         const { error: segErr } = await admin.from('segments').insert(chunk);
-        if (segErr) throw new Error(`Failed to insert seed segments: ${segErr.message}`);
+        if (segErr) {
+          console.error('[seed-demo] segments insert error:', segErr);
+          throw new Error(`Failed to insert seed segments: ${segErr.message}`);
+        }
       }
     }
 
@@ -194,7 +207,10 @@ Deno.serve(async (req: Request) => {
       for (let i = 0; i < seed.painRatings.length; i += 50) {
         const chunk = seed.painRatings.slice(i, i + 50);
         const { error: prErr } = await admin.from('pain_ratings').insert(chunk);
-        if (prErr) throw new Error(`Failed to insert seed pain ratings: ${prErr.message}`);
+        if (prErr) {
+          console.error('[seed-demo] pain ratings insert error:', prErr);
+          throw new Error(`Failed to insert seed pain ratings: ${prErr.message}`);
+        }
       }
     }
 

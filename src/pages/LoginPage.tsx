@@ -137,7 +137,16 @@ export const LoginPage: React.FC = () => {
       });
 
       if (seedErr) {
-        console.warn('[demo] seed-demo failed:', seedErr.message);
+        let details = seedErr.message;
+        if ('context' in seedErr && seedErr.context && typeof (seedErr.context as any).json === 'function') {
+          try {
+            const errJson = await (seedErr.context as any).clone().json();
+            if (errJson?.error) details = errJson.error;
+          } catch {
+            // ignore
+          }
+        }
+        console.warn('[demo] seed-demo failed:', details);
         setError("I couldn't set up the demo. Please try again.");
         setSettingUpDemo(false);
         return;

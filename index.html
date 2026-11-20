@@ -10,6 +10,13 @@
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>Little Hours</title>
+    <script>
+      window.onloadTurnstileCallback = function() {
+        if (typeof window.__onTurnstileLoaded === 'function') {
+          window.__onTurnstileLoaded();
+        }
+      };
+    </script>
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback&render=explicit" async defer></script>
   </head>
   <body>

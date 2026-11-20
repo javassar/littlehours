@@ -19,6 +19,7 @@ declare global {
       remove: (widgetId: string) => void;
     };
     onloadTurnstileCallback?: () => void;
+    __onTurnstileLoaded?: () => void;
   }
 }
 
@@ -144,12 +145,14 @@ export const TurnstileWidget = forwardRef<TurnstileWidgetRef, TurnstileWidgetPro
         }
       };
 
-      // Register official Cloudflare onload callback
-      window.onloadTurnstileCallback = () => {
+      // Register callback with the global hook defined in index.html
+      const onLoaded = () => {
         if (isMounted) {
           renderWidget();
         }
       };
+      window.__onTurnstileLoaded = onLoaded;
+      window.onloadTurnstileCallback = onLoaded;
 
       // If the Turnstile API is already loaded in the window
       if (window.turnstile?.render) {
@@ -176,9 +179,7 @@ export const TurnstileWidget = forwardRef<TurnstileWidgetRef, TurnstileWidgetPro
 
       return () => {
         isMounted = false;
-        if (window.onloadTurnstileCallback) {
-          window.onloadTurnstileCallback = undefined;
-        }
+        window.__onTurnstileLoaded = undefined;
         if (checkInterval) clearInterval(checkInterval);
         if (checkTimeout) clearTimeout(checkTimeout);
         if (widgetIdRef.current && window.turnstile) {
