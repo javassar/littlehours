@@ -1,8 +1,8 @@
 # Little Hours
 
-Little Hours is an offline-first progressive web app for logging daily activities in natural language. Instead of starting stopwatches or picking categories from dropdown menus, you write a sentence about what you did, and the application parses it into structured, contiguous time segments.
+Little Hours is an offline-first progressive web app for logging daily activities and chronic health patterns in natural language. Instead of managing stopwatches or picking categories from rigid dropdowns, users simply write a sentence about how they spent their time since their last log. An AI pipeline asynchronously parses each entry into structured, contiguous timeline segments with social context, while keeping the raw text as an immutable source of truth. Users can opt in to receive hourly reminders to log how they spent their time and/or log on their own accord. Designed with a warm, tactile storybook aesthetic, Little Hours combines private hourly logging, intelligent reminder suppression, and seamless offline sync into a gentle, low-friction personal journal that lends to easy data analysis. 
 
-[Live Demo](https://littlehours-me5o3tub0-jackieackieackie.vercel.app/) *(click "Try the demo" on the login screen to enter a temporary sandbox)*
+[Live Demo](https://littlehours.vercel.app/login) *(click "Try the demo" on the login screen to enter a temporary sandbox)*
 
 ---
 
