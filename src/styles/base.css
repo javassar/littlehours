@@ -49,8 +49,8 @@ body {
   min-height: 100dvh;
   position: relative;
   overflow-x: hidden;
-  background-color: var(--bg-deep);
-  background: var(--bg-deep);
+  background-color: #F5EAE7;
+  background: #F5EAE7;
   color: var(--ink);
 }
 

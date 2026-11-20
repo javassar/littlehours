@@ -21,7 +21,7 @@ export const DesignPage: React.FC = () => {
   const [designPain, setDesignPain] = useState<number | null>(3);
 
   const colors = [
-    { token: '--bg', hex: '#EBD9D6', name: 'Page Background' },
+    { token: '--bg', hex: '#F6EDEA', name: 'Page Background' },
     { token: '--bg-deep', hex: '#EBD9D6', name: 'Gradient Deep' },
     { token: '--surface', hex: '#FBF6F3', name: 'Cream Surface' },
     { token: '--surface-sunk', hex: '#F3E6E3', name: 'Sunk Input Surface' },
