@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 
 declare global {
   interface Window {
@@ -16,8 +16,13 @@ declare global {
       ) => string;
       reset: (widgetId: string) => void;
       remove: (widgetId: string) => void;
+      ready?: (callback: () => void) => void;
     };
   }
+}
+
+export interface TurnstileWidgetRef {
+  reset: () => void;
 }
 
 export interface TurnstileWidgetProps {
@@ -29,46 +34,67 @@ export interface TurnstileWidgetProps {
 // Published Cloudflare testing site key that always passes in development / tests
 const FALLBACK_TEST_SITE_KEY = '1x00000000000000000000AA';
 
-export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
-  onToken,
-  onError,
-  onExpire,
-}) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const widgetIdRef = useRef<string | null>(null);
+export const TurnstileWidget = forwardRef<TurnstileWidgetRef, TurnstileWidgetProps>(
+  ({ onToken, onError, onExpire }, ref) => {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const widgetIdRef = useRef<string | null>(null);
 
-  const siteKey =
-    import.meta.env.VITE_TURNSTILE_SITE_KEY &&
-    import.meta.env.VITE_TURNSTILE_SITE_KEY.trim() !== ''
-      ? import.meta.env.VITE_TURNSTILE_SITE_KEY.trim()
-      : FALLBACK_TEST_SITE_KEY;
+    const siteKey =
+      import.meta.env.VITE_TURNSTILE_SITE_KEY &&
+      import.meta.env.VITE_TURNSTILE_SITE_KEY.trim() !== ''
+        ? import.meta.env.VITE_TURNSTILE_SITE_KEY.trim()
+        : FALLBACK_TEST_SITE_KEY;
 
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadAndRender = () => {
-      if (!isMounted || !containerRef.current) return;
-
-      if (window.turnstile) {
-        try {
-          if (widgetIdRef.current) {
-            window.turnstile.remove(widgetIdRef.current);
-            widgetIdRef.current = null;
+    useImperativeHandle(ref, () => ({
+      reset: () => {
+        if (widgetIdRef.current && window.turnstile) {
+          try {
+            window.turnstile.reset(widgetIdRef.current);
+          } catch (err) {
+            console.warn('[turnstile] Reset error:', err);
           }
+        }
+      },
+    }));
 
+    useEffect(() => {
+      let isMounted = true;
+      let checkInterval: ReturnType<typeof setInterval> | null = null;
+      let checkTimeout: ReturnType<typeof setTimeout> | null = null;
+
+      const renderWidget = () => {
+        if (!isMounted || !containerRef.current || !window.turnstile) return;
+
+        // Clean up any existing widget in container
+        if (widgetIdRef.current) {
+          try {
+            window.turnstile.remove(widgetIdRef.current);
+          } catch {
+            // ignore
+          }
+          widgetIdRef.current = null;
+        }
+
+        if (containerRef.current) {
+          containerRef.current.innerHTML = '';
+        }
+
+        try {
           const id = window.turnstile.render(containerRef.current, {
             sitekey: siteKey,
             callback: (token: string) => {
               if (isMounted) onToken(token);
             },
             'error-callback': (err: any) => {
+              console.warn('[turnstile] Error callback:', err);
               if (isMounted && onError) onError(err);
             },
             'expired-callback': () => {
+              console.warn('[turnstile] Token expired');
               if (isMounted && onExpire) onExpire();
             },
             theme: 'light',
-            size: 'flexible',
+            size: 'normal',
           });
 
           widgetIdRef.current = id;
@@ -76,65 +102,71 @@ export const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
           console.warn('[turnstile] Render error:', err);
           if (isMounted && onError) onError(err);
         }
-        return;
-      }
+      };
 
-      // Check if script already exists in document
-      let script = document.querySelector('script[src*="turnstile"]') as HTMLScriptElement | null;
-      if (!script) {
-        script = document.createElement('script');
-        script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-        script.async = true;
-        script.defer = true;
-        document.head.appendChild(script);
-      }
+      const startRender = () => {
+        if (!isMounted) return;
 
-      const checkInterval = setInterval(() => {
-        if (!isMounted) {
-          clearInterval(checkInterval);
+        if (window.turnstile) {
+          if (typeof window.turnstile.ready === 'function') {
+            window.turnstile.ready(renderWidget);
+          } else {
+            renderWidget();
+          }
           return;
         }
-        if (window.turnstile) {
-          clearInterval(checkInterval);
-          loadAndRender();
-        }
-      }, 100);
 
-      const timeout = setTimeout(() => {
-        clearInterval(checkInterval);
-      }, 10000);
+        // Script might still be loading, poll until window.turnstile is ready
+        checkInterval = setInterval(() => {
+          if (!isMounted) {
+            if (checkInterval) clearInterval(checkInterval);
+            return;
+          }
+          if (window.turnstile) {
+            if (checkInterval) clearInterval(checkInterval);
+            checkInterval = null;
+            if (typeof window.turnstile.ready === 'function') {
+              window.turnstile.ready(renderWidget);
+            } else {
+              renderWidget();
+            }
+          }
+        }, 100);
+
+        checkTimeout = setTimeout(() => {
+          if (checkInterval) clearInterval(checkInterval);
+          checkInterval = null;
+        }, 10000);
+      };
+
+      startRender();
 
       return () => {
-        clearInterval(checkInterval);
-        clearTimeout(timeout);
-      };
-    };
-
-    loadAndRender();
-
-    return () => {
-      isMounted = false;
-      if (widgetIdRef.current && window.turnstile) {
-        try {
-          window.turnstile.remove(widgetIdRef.current);
-        } catch {
-          // ignore
+        isMounted = false;
+        if (checkInterval) clearInterval(checkInterval);
+        if (checkTimeout) clearTimeout(checkTimeout);
+        if (widgetIdRef.current && window.turnstile) {
+          try {
+            window.turnstile.remove(widgetIdRef.current);
+          } catch {
+            // ignore
+          }
+          widgetIdRef.current = null;
         }
-        widgetIdRef.current = null;
-      }
-    };
-  }, [siteKey]);
+      };
+    }, [siteKey]);
 
-  return (
-    <div
-      ref={containerRef}
-      style={{
-        minHeight: 45,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        margin: '8px 0',
-      }}
-    />
-  );
-};
+    return (
+      <div
+        ref={containerRef}
+        style={{
+          minHeight: 65,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          margin: '12px 0',
+        }}
+      />
+    );
+  }
+);

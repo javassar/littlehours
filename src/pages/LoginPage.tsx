@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { Card, Button, Swan, RotatingSparkle, TurnstileWidget } from '../components';
+import { Card, Button, Swan, RotatingSparkle, TurnstileWidget, TurnstileWidgetRef } from '../components';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 
@@ -15,6 +15,7 @@ export const LoginPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [settingUpDemo, setSettingUpDemo] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileWidgetRef>(null);
 
   // Check if session ended flag was set by auth provider or cleanup job
   useEffect(() => {
@@ -77,6 +78,8 @@ export const LoginPage: React.FC = () => {
 
     if (result.error) {
       setError(result.error);
+      turnstileRef.current?.reset();
+      setCaptchaToken(null);
     } else {
       navigate(from, { replace: true });
     }
@@ -84,16 +87,27 @@ export const LoginPage: React.FC = () => {
 
   const handleTryDemo = async () => {
     setError(null);
+
+    if (!captchaToken) {
+      setError('Please complete the verification check above to start the demo.');
+      return;
+    }
+
     setSettingUpDemo(true);
 
     try {
       // 1. Sign in anonymously with captchaToken
-      const { error: anonErr } = await signInAnonymously(captchaToken || undefined);
+      const { error: anonErr } = await signInAnonymously(captchaToken);
       if (anonErr) {
         console.warn('[demo] signInAnonymously failed:', anonErr);
+        turnstileRef.current?.reset();
+        setCaptchaToken(null);
+
         const low = anonErr.toLowerCase();
-        if (low.includes('rate') || low.includes('captcha') || low.includes('limit')) {
+        if (low.includes('rate') || low.includes('limit')) {
           setError('The demo is busy right now. Please try again in a few minutes.');
+        } else if (low.includes('captcha')) {
+          setError('Verification failed. Please check the verification box above and try again.');
         } else {
           setError("I couldn't set up the demo. Please try again.");
         }
@@ -183,8 +197,15 @@ export const LoginPage: React.FC = () => {
           </div>
 
           <TurnstileWidget
-            onToken={(tok) => setCaptchaToken(tok)}
+            ref={turnstileRef}
+            onToken={(tok) => {
+              setCaptchaToken(tok);
+              setError(null);
+            }}
             onExpire={() => setCaptchaToken(null)}
+            onError={() => {
+              setError("Verification couldn't load. If you use an ad blocker or privacy extension, please pause it and refresh.");
+            }}
           />
 
           <div style={{ marginTop: 16 }}>
