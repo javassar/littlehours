@@ -224,6 +224,27 @@
   color: var(--mauve);
 }
 
+/* Storybook Swan Colophon at bottom of Log screen */
+.log-swan-colophon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: clamp(20px, 3.5vh, 32px);
+  margin-bottom: clamp(16px, 2.5vh, 24px);
+  pointer-events: none;
+  user-select: none;
+}
+
+.log-swan-colophon-img {
+  width: 175px;
+  max-width: 65vw;
+  height: auto;
+  opacity: 0.88;
+  mix-blend-mode: multiply;
+  filter: contrast(1.1) saturate(1.15);
+  display: block;
+}
+
 /* Empty History State */
 .empty-history-state {
   display: flex;

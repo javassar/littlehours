@@ -12,6 +12,7 @@ import {
 } from '../components';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
+import swansPurple from '../components/illustrations/swans_purple.png';
 import { formatWindowSince, formatTime, formatDuration } from '../lib/time';
 import {
   enqueueEntry,
@@ -727,6 +728,17 @@ export const LogPage: React.FC = () => {
           </span>
         </div>
       )}
+
+      {/* Storybook swan end-piece / colophon */}
+      <div className="log-swan-colophon" aria-hidden="true">
+        <img
+          src={swansPurple}
+          alt=""
+          className="log-swan-colophon-img"
+          width={175}
+          height={86}
+        />
+      </div>
 
       {/* Window edit sheet */}
       <WindowEditSheet
