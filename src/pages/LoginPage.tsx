@@ -14,7 +14,6 @@ export const LoginPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [settingUpDemo, setSettingUpDemo] = useState(false);
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const turnstileRef = useRef<TurnstileWidgetRef>(null);
 
   // Check if session ended flag was set by auth provider or cleanup job
@@ -73,13 +72,21 @@ export const LoginPage: React.FC = () => {
     }
 
     setSubmitting(true);
-    const result = await signIn(email, password, captchaToken || undefined);
+
+    // Ensure we have a valid captcha token (awaits background verification if still running)
+    const token = await turnstileRef.current?.getToken();
+    if (!token) {
+      setSubmitting(false);
+      setError('Security verification is still running. Please wait a moment and try again.');
+      return;
+    }
+
+    const result = await signIn(email, password, token);
     setSubmitting(false);
 
     if (result.error) {
       setError(result.error);
       turnstileRef.current?.reset();
-      setCaptchaToken(null);
     } else {
       navigate(from, { replace: true });
     }
@@ -87,21 +94,22 @@ export const LoginPage: React.FC = () => {
 
   const handleTryDemo = async () => {
     setError(null);
-
-    if (!captchaToken) {
-      setError('Please complete the verification check above to start the demo.');
-      return;
-    }
-
     setSettingUpDemo(true);
 
     try {
+      // Ensure we have a valid captcha token (awaits background verification if still running)
+      const token = await turnstileRef.current?.getToken();
+      if (!token) {
+        setSettingUpDemo(false);
+        setError('Security verification is still running. Please wait a moment and try again.');
+        return;
+      }
+
       // 1. Sign in anonymously with captchaToken
-      const { error: anonErr } = await signInAnonymously(captchaToken);
+      const { error: anonErr } = await signInAnonymously(token);
       if (anonErr) {
         console.warn('[demo] signInAnonymously failed:', anonErr);
         turnstileRef.current?.reset();
-        setCaptchaToken(null);
 
         const low = anonErr.toLowerCase();
         if (low.includes('rate') || low.includes('limit')) {
@@ -121,11 +129,11 @@ export const LoginPage: React.FC = () => {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      const token = session?.access_token;
+      const sessionToken = session?.access_token;
 
       const { error: seedErr } = await supabase.functions.invoke('seed-demo', {
         body: { timezone: browserTz, reset: false },
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        headers: sessionToken ? { Authorization: `Bearer ${sessionToken}` } : undefined,
       });
 
       if (seedErr) {
@@ -198,11 +206,9 @@ export const LoginPage: React.FC = () => {
 
           <TurnstileWidget
             ref={turnstileRef}
-            onToken={(tok) => {
-              setCaptchaToken(tok);
+            onToken={() => {
               setError(null);
             }}
-            onExpire={() => setCaptchaToken(null)}
             onError={() => {
               setError("Verification couldn't load. If you use an ad blocker or privacy extension, please pause it and refresh.");
             }}

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
+import { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react';
+import { RotatingSparkle } from './Sparkles';
 
 declare global {
   interface Window {
@@ -23,6 +24,7 @@ declare global {
 
 export interface TurnstileWidgetRef {
   reset: () => void;
+  getToken: () => Promise<string | null>;
 }
 
 export interface TurnstileWidgetProps {
@@ -38,6 +40,9 @@ export const TurnstileWidget = forwardRef<TurnstileWidgetRef, TurnstileWidgetPro
   ({ onToken, onError, onExpire }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const widgetIdRef = useRef<string | null>(null);
+    const tokenRef = useRef<string | null>(null);
+    const pendingResolvers = useRef<Array<(token: string | null) => void>>([]);
+    const [status, setStatus] = useState<'verifying' | 'verified' | 'error'>('verifying');
 
     const siteKey =
       import.meta.env.VITE_TURNSTILE_SITE_KEY &&
@@ -47,6 +52,8 @@ export const TurnstileWidget = forwardRef<TurnstileWidgetRef, TurnstileWidgetPro
 
     useImperativeHandle(ref, () => ({
       reset: () => {
+        tokenRef.current = null;
+        setStatus('verifying');
         if (widgetIdRef.current && window.turnstile) {
           try {
             window.turnstile.reset(widgetIdRef.current);
@@ -54,6 +61,21 @@ export const TurnstileWidget = forwardRef<TurnstileWidgetRef, TurnstileWidgetPro
             console.warn('[turnstile] Reset error:', err);
           }
         }
+      },
+      getToken: () => {
+        if (tokenRef.current) {
+          return Promise.resolve(tokenRef.current);
+        }
+        return new Promise<string | null>((resolve) => {
+          const timeout = setTimeout(() => {
+            resolve(tokenRef.current);
+          }, 6000);
+
+          pendingResolvers.current.push((tok) => {
+            clearTimeout(timeout);
+            resolve(tok);
+          });
+        });
       },
     }));
 
@@ -83,15 +105,28 @@ export const TurnstileWidget = forwardRef<TurnstileWidgetRef, TurnstileWidgetPro
           const id = window.turnstile.render(containerRef.current, {
             sitekey: siteKey,
             callback: (token: string) => {
-              if (isMounted) onToken(token);
+              if (!isMounted) return;
+              console.log('[turnstile] Security check passed, token ready');
+              tokenRef.current = token;
+              setStatus('verified');
+              pendingResolvers.current.forEach((res) => res(token));
+              pendingResolvers.current = [];
+              onToken(token);
             },
             'error-callback': (err: any) => {
               console.warn('[turnstile] Error callback:', err);
-              if (isMounted && onError) onError(err);
+              if (!isMounted) return;
+              setStatus('error');
+              pendingResolvers.current.forEach((res) => res(null));
+              pendingResolvers.current = [];
+              if (onError) onError(err);
             },
             'expired-callback': () => {
               console.warn('[turnstile] Token expired');
-              if (isMounted && onExpire) onExpire();
+              if (!isMounted) return;
+              tokenRef.current = null;
+              setStatus('verifying');
+              if (onExpire) onExpire();
             },
             theme: 'light',
             size: 'normal',
@@ -100,7 +135,12 @@ export const TurnstileWidget = forwardRef<TurnstileWidgetRef, TurnstileWidgetPro
           widgetIdRef.current = id;
         } catch (err) {
           console.warn('[turnstile] Render error:', err);
-          if (isMounted && onError) onError(err);
+          if (isMounted) {
+            setStatus('error');
+            pendingResolvers.current.forEach((res) => res(null));
+            pendingResolvers.current = [];
+            if (onError) onError(err);
+          }
         }
       };
 
@@ -153,16 +193,35 @@ export const TurnstileWidget = forwardRef<TurnstileWidgetRef, TurnstileWidgetPro
     }, [siteKey]);
 
     return (
-      <div
-        ref={containerRef}
-        style={{
-          minHeight: 65,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          margin: '12px 0',
-        }}
-      />
+      <div style={{ margin: '12px 0', textAlign: 'center' }}>
+        <div
+          ref={containerRef}
+          style={{
+            minHeight: 65,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        />
+        {status === 'verifying' && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              fontSize: 13,
+              color: 'var(--mauve)',
+              fontStyle: 'italic',
+              fontFamily: 'var(--font-body)',
+              marginTop: 4,
+            }}
+          >
+            <RotatingSparkle size={14} color="var(--gold)" />
+            <span>Verifying security check...</span>
+          </div>
+        )}
+      </div>
     );
   }
 );
