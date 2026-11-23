@@ -24,4 +24,5 @@ export * from './ConfirmModal';
 export * from './BotanicalCorner';
 export * from './CameoWreath';
 export * from './WorkCategoriesSheet';
+export * from './DayDetailSheet';
 export * from './illustrations';

@@ -647,9 +647,8 @@ export function computeWeekSummary(params: ComputeWeekSummaryParams): WeekSummar
         if (!sl.isVacation && categoriesUsed.includes(sl.category)) {
           dayWorkMs += dur;
         }
-        if (!sl.isVacation) {
-          catMsMap.set(sl.category, (catMsMap.get(sl.category) || 0) + dur);
-        }
+        const effectiveCat = sl.isVacation ? 'vacation' : sl.category;
+        catMsMap.set(effectiveCat, (catMsMap.get(effectiveCat) || 0) + dur);
       }
     }
 
@@ -792,9 +791,18 @@ export function computeWeekSummary(params: ComputeWeekSummaryParams): WeekSummar
   const loggedMinutes = Math.round(loggedMs / 60000);
   const availableMinutes = Math.round(availableMs / 60000);
   const coveragePercentage = availableMs > 0 ? Math.round((loggedMs / availableMs) * 100) : 0;
+  const formatCoverageDuration = (mins: number) => {
+    if (mins <= 0) return '0h';
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    if (h === 0) return `${m}m`;
+    if (m === 0) return `${h}h`;
+    return `${h}h ${m}m`;
+  };
+
   const coverageText = isCurrentWeek
-    ? `Logged ${formatHoursMinutes(loggedMinutes)} of ${formatHoursMinutes(availableMinutes)} so far.`
-    : `Logged ${formatHoursMinutes(loggedMinutes)} of ${formatHoursMinutes(availableMinutes)}.`;
+    ? `Logged ${formatCoverageDuration(loggedMinutes)} of ${formatCoverageDuration(availableMinutes)} so far.`
+    : `Logged ${formatCoverageDuration(loggedMinutes)} of ${formatCoverageDuration(availableMinutes)}.`;
 
   const coverage: CoverageSummary = {
     loggedMs,
