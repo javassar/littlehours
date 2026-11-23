@@ -7,8 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "node test/milestone-4-4.test.mjs",
-    "test:all": "node test/milestone-4-1.test.mjs && node test/milestone-4-2.test.mjs && node test/milestone-4-3.test.mjs && node test/milestone-4-4.test.mjs"
+    "test": "node test/milestone-4-5.test.mjs",
+    "test:all": "node test/milestone-4-1.test.mjs && node test/milestone-4-2.test.mjs && node test/milestone-4-3.test.mjs && node test/milestone-4-4.test.mjs && node test/milestone-4-5.test.mjs"
   },
   "dependencies": {
     "@fontsource/cormorant-garamond": "^5.1.0",

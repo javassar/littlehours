@@ -14,9 +14,9 @@ Little Hours is an offline-first progressive web app for logging daily activitie
 | :---: | :---: | :---: |
 | <img src="docs/screenshots/login.png" width="240" alt="Login Screen" /> | <img src="docs/screenshots/log.png" width="240" alt="Log Screen" /> | <img src="docs/screenshots/confirmation.png" width="240" alt="Segment Confirmation" /> |
 
-| Pain Rating Guide | History & Segments (Demo Mode) | Settings (Demo Mode) |
-| :---: | :---: | :---: |
-| <img src="docs/screenshots/pain-guide.png" width="240" alt="Pain Rating Guide" />| <img src="docs/screenshots/history_demo.png" width="240" alt="History (Demo Mode)" /> | <img src="docs/screenshots/settings_demo.png" width="240" alt="Settings (Demo Mode)" /> |
+| Pain Rating Guide | History & Segments (Demo Mode) | Settings (Demo Mode) | Week in Review |
+| :---: | :---: | :---: | :---: |
+| <img src="docs/screenshots/pain-guide.png" width="240" alt="Pain Rating Guide" />| <img src="docs/screenshots/history_demo.png" width="240" alt="History (Demo Mode)" /> | <img src="docs/screenshots/settings_demo.png" width="240" alt="Settings (Demo Mode)" /> | <img src="docs/screenshots/week-review.png" width="240" alt="Week in Review" /> |
 
 ---
 
@@ -48,8 +48,12 @@ Little Hours is an offline-first progressive web app for logging daily activitie
 - **Web Push (VAPID)**: Scheduled reminders run through a Supabase Edge Function triggered by `pg_cron`.
 - **Intelligent suppression**: The worker checks recent activity and skips reminders if the user has logged an entry or submitted a pain rating within the last 30 minutes.
 
+### Deterministic Week in Review Analysis
+- **Zero LLM cost & client-side determinism**: Weekly metrics on the "Week in Review" screen are computed completely client-side from existing timeline segments using pure, deterministic TypeScript code—with **no LLM calls and zero external API dependencies**.
+- **Accurate workplace reporting**: Handles timezone-aware boundary clipping, day-level rounding, overlap reconciliation, companion tracking, gap detection, and week-over-week comparisons. Users can configure which categories count toward their reported hours, toggle between hours-and-minutes and decimal format, and copy their report in one tap.
+
 ### Ephemeral Demo Sandboxes
-- **Visitor isolation**: Portfolio visitors can test the full application without creating an account. The demo provisions a temporary anonymous Supabase user pre-seeded with 7 days of realistic time data matching the visitor's local timezone.
+- **Visitor isolation**: Portfolio visitors can test the full application without creating an account. The demo provisions a temporary anonymous Supabase user pre-seeded with 14 days of realistic time data matching the visitor's local timezone (with work segments on weekdays to showcase a full week review and week-over-week comparison).
 - **Security controls**: Anonymous users are governed by PostgreSQL Row-Level Security (RLS), protected by Cloudflare Turnstile, restricted from accessing push subscriptions, and capped to daily AI rate limits. Sandboxes are purged automatically after 7 days via a scheduled database cleanup job.
 
 ---

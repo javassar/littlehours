@@ -671,17 +671,41 @@ export function generateDemoSeedData(userId: string, timeZone: string, now: Date
   const currentTotalMinutes = localHour * 60 + localMinute;
   const todayCutoffMinutes = Math.max(8 * 60, currentTotalMinutes - 90); // at least cover morning sleep + breakfast
 
-  // Six full past days (dayOffsets -6 to -1)
-  const pastDays = [-6, -5, -4, -3, -2, -1];
+  // 13 full past days (dayOffsets -13 to -1) + today = 14 days (SPEC-3.9 Milestone 4.5)
+  const pastDays = [-13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1];
+
+  // Weekday templates with work segments
+  const weekdayTemplates = [
+    DAY_TEMPLATES[0], // Weekday A1
+    DAY_TEMPLATES[1], // Weekday A2
+    DAY_TEMPLATES[3], // Weekday A3
+  ];
+
+  // Weekend templates
+  const weekendTemplates = [
+    DAY_TEMPLATES[4], // Weekend Event B1
+    DAY_TEMPLATES[5], // Weekend B2
+  ];
+
+  let weekdayIdx = 0;
+  let weekendIdx = 0;
+
   for (let i = 0; i < pastDays.length; i++) {
     const dayOffset = pastDays[i];
-    const template = DAY_TEMPLATES[i % DAY_TEMPLATES.length];
 
     // Compute calendar date for this past day
     const baseDate = new Date(Date.UTC(localYear, localMonth - 1, localDay + dayOffset));
     const y = baseDate.getUTCFullYear();
     const m = baseDate.getUTCMonth() + 1;
     const d = baseDate.getUTCDate();
+
+    // Check if weekend (Saturday or Sunday) in the target timezone
+    const weekdayShort = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone }).format(baseDate);
+    const isWeekend = weekdayShort === 'Sat' || weekdayShort === 'Sun';
+
+    const template = isWeekend
+      ? weekendTemplates[weekendIdx++ % weekendTemplates.length]
+      : weekdayTemplates[weekdayIdx++ % weekdayTemplates.length];
 
     // Next day's date for midnight wrap
     const nextDate = new Date(Date.UTC(localYear, localMonth - 1, localDay + dayOffset + 1));

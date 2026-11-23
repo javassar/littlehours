@@ -168,6 +168,7 @@ Deno.serve(async (req: Request) => {
         categories: demoCategories,
         vacation_mode: false,
         reminders_enabled: false,
+        work_report_categories: ['work'],
       },
       { onConflict: 'user_id' }
     );
@@ -176,7 +177,7 @@ Deno.serve(async (req: Request) => {
       throw new Error(`Failed to save settings: ${settingsErr.message}`);
     }
 
-    // 6. Generate 7 days of realistic seed data
+    // 6. Generate 14 days of realistic seed data (SPEC-3.9 Milestone 4.5)
     const seed = generateDemoSeedData(userId, timeZone, new Date());
 
     // 7. Insert entries, segments, and pain_ratings in batches
