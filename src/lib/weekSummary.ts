@@ -232,6 +232,54 @@ export function formatDecimalHours(totalMinutes: number): string {
 }
 
 /**
+ * Format the week selector date range label, e.g. "Nov 16 to Nov 22" or "Oct 26 to Nov 1".
+ */
+export function formatWeekDateRange(weekStart: Date, timeZone: string): string {
+  const partsStart = getZonedDateParts(weekStart, timeZone);
+  const sunCal = new Date(Date.UTC(partsStart.year, partsStart.month - 1, partsStart.day + 6));
+  const sunParts = getZonedDateParts(
+    createZonedDate(sunCal.getUTCFullYear(), sunCal.getUTCMonth() + 1, sunCal.getUTCDate(), 0, 0, timeZone),
+    timeZone
+  );
+
+  const monthShorts = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const startMonth = monthShorts[partsStart.month - 1];
+  const endMonth = monthShorts[sunParts.month - 1];
+
+  return `${startMonth} ${partsStart.day} to ${endMonth} ${sunParts.day}`;
+}
+
+/**
+ * Generates the plain text block for "Copy for my report" (Section 6.2).
+ */
+export function generateReportText(
+  summary: WeekSummaryResult,
+  timeZone: string,
+  hoursFormat: 'hours_minutes' | 'decimal' = 'hours_minutes'
+): string {
+  const rangeStr = formatWeekDateRange(summary.weekStart, timeZone);
+  const totalStr =
+    hoursFormat === 'decimal'
+      ? formatDecimalHours(summary.work.totalMinutes)
+      : formatHoursMinutes(summary.work.totalMinutes);
+
+  const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const dayLines = summary.work.perDay.map((min, idx) => {
+    const formatted =
+      hoursFormat === 'decimal'
+        ? formatDecimalHours(min)
+        : formatHoursMinutes(min);
+    return `${dayNames[idx]} ${formatted}`;
+  });
+
+  return [
+    `Week of ${rangeStr}`,
+    `Hours worked: ${totalStr}`,
+    ...dayLines,
+  ].join('\n');
+}
+
+/**
  * Resolves a category color using stored color, Chip CATEGORY_TINTS, or palette cycling.
  */
 export function resolveCategoryColor(

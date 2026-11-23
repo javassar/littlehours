@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Button, Hummingbird, Chip, Toast, CategoriesSheet, PeopleSheet, ConfirmModal } from '../components';
+import { Card, Button, Hummingbird, Chip, Toast, CategoriesSheet, PeopleSheet, ConfirmModal, WorkCategoriesSheet } from '../components';
 import { DEMO_RESETS_PER_DAY } from '../lib/demoConfig';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
@@ -60,6 +60,18 @@ export const SettingsPage: React.FC = () => {
 
   // People management (Milestone 3.7)
   const [peopleSheetOpen, setPeopleSheetOpen] = useState(false);
+
+  // Work report categories (Milestone 4.2)
+  const [workCategoriesSheetOpen, setWorkCategoriesSheetOpen] = useState(false);
+  const [workReportCategories, setWorkReportCategories] = useState<string[]>(
+    settings?.work_report_categories || ['work']
+  );
+
+  useEffect(() => {
+    if (settings?.work_report_categories) {
+      setWorkReportCategories(settings.work_report_categories);
+    }
+  }, [settings?.work_report_categories]);
 
   // Vacation mode state & toggle (Milestone 3.7)
   const [vacationMode, setVacationModeState] = useState<boolean>(Boolean(settings?.vacation_mode));
@@ -1016,6 +1028,46 @@ export const SettingsPage: React.FC = () => {
           categories={categories}
           onClose={() => setCategoriesSheetOpen(false)}
           onCategoriesUpdated={handleCategoriesUpdated}
+          onToast={showToast}
+        />
+      )}
+
+      {/* Hours I report to my workplace (Milestone 4.2) */}
+      <Card className="settings-card mb-4">
+        <div className="settings-section-header">
+          <h3 className="section-title" style={{ margin: 0 }}>
+            Hours I report to my workplace
+          </h3>
+          <Button
+            variant="secondary"
+            onClick={() => setWorkCategoriesSheetOpen(true)}
+            aria-label="Change reported work categories"
+          >
+            Change
+          </Button>
+        </div>
+        <p className="section-desc" style={{ marginBottom: 12 }}>
+          Choose which categories count toward your reported work hours on the Week in Review screen.
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+          {workReportCategories.map((catName) => (
+            <Chip key={catName} label={catName} size="sm" />
+          ))}
+        </div>
+      </Card>
+
+      {/* Work Categories Sheet Dialog */}
+      {user && (
+        <WorkCategoriesSheet
+          isOpen={workCategoriesSheetOpen}
+          userId={user.id}
+          categories={categories}
+          workCategories={workReportCategories}
+          onClose={() => setWorkCategoriesSheetOpen(false)}
+          onWorkCategoriesUpdated={(newCats) => {
+            setWorkReportCategories(newCats);
+            refreshSettings?.();
+          }}
           onToast={showToast}
         />
       )}
