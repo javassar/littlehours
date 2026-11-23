@@ -11,6 +11,7 @@ import {
   formatWeekDateRange,
   formatHoursMinutes,
   formatDecimalHours,
+  formatGapRange,
   generateReportText,
   WeekSummaryResult,
   DaySummary,
@@ -34,6 +35,7 @@ export const WeekPage: React.FC = () => {
   const [workCategoriesSheetOpen, setWorkCategoriesSheetOpen] = useState(false);
   const [showAllCategories, setShowAllCategories] = useState(false);
   const [selectedDayForSheet, setSelectedDayForSheet] = useState<DaySummary | null>(null);
+  const [gapsExpanded, setGapsExpanded] = useState(false);
 
   // 2. Format toggle (stored in localStorage)
   const [hoursFormat, setHoursFormat] = useState<'hours_minutes' | 'decimal'>(() => {
@@ -306,6 +308,54 @@ export const WeekPage: React.FC = () => {
         </Card>
       )}
 
+      {/* 6.3 Data quality notice */}
+      {(() => {
+        const hasAttention = summary.quality.entriesNeedingAttention > 0;
+        const hasUnconfirmed = summary.quality.unconfirmedSegments > 0;
+        const hasUnsynced = summary.quality.unsyncedChanges > 0;
+        if (!hasAttention && !hasUnconfirmed && !hasUnsynced) return null;
+
+        return (
+          <div className="week-quality-notice-card" role="alert">
+            <div className="week-quality-notice-items">
+              {hasAttention && (
+                <div className="week-quality-notice-row">
+                  <span className="week-quality-notice-text">
+                    {summary.quality.entriesNeedingAttention === 1
+                      ? '1 entry is still waiting to be sorted. Totals may change.'
+                      : `${summary.quality.entriesNeedingAttention} entries are still waiting to be sorted. Totals may change.`}
+                  </span>
+                  <Link to="/history" className="week-notice-action-btn">
+                    Open History
+                  </Link>
+                </div>
+              )}
+              {hasUnconfirmed && (
+                <div className="week-quality-notice-row">
+                  <span className="week-quality-notice-text">
+                    {summary.quality.unconfirmedSegments === 1
+                      ? '1 segment is unchecked.'
+                      : `${summary.quality.unconfirmedSegments} segments are unchecked.`}
+                  </span>
+                  <Link to="/history" className="week-notice-action-btn">
+                    Open History
+                  </Link>
+                </div>
+              )}
+              {hasUnsynced && (
+                <div className="week-quality-notice-row">
+                  <span className="week-quality-notice-text">
+                    {summary.quality.unsyncedChanges === 1
+                      ? '1 change has not synced yet.'
+                      : `${summary.quality.unsyncedChanges} changes have not synced yet.`}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* 6.4 Where the hours went */}
       {(loading || summary.loggedMs > 0) && (
         <Card className="week-breakdown-card">
@@ -390,6 +440,45 @@ export const WeekPage: React.FC = () => {
         </Card>
       )}
 
+      {/* 6.5 Against last week */}
+      {(loading || summary.loggedMs > 0) && !summary.isAllVacation && !isEarliestWeek && (
+        <Card className="week-comparison-card">
+          <div className="week-card-header">
+            <h3 className="section-title">Against last week</h3>
+          </div>
+
+          {!summary.comparison.available ? (
+            <p className="week-comparison-notice">
+              {summary.comparison.reason || 'Last week has too little data to compare.'}
+            </p>
+          ) : (
+            <div className="week-comparison-list" role="list">
+              <div className="week-comparison-row week-comparison-work-row" role="listitem">
+                <span className="week-comparison-label">Hours worked</span>
+                <span className="week-comparison-delta">
+                  {summary.comparison.workDeltaMinutes > 0
+                    ? `+${formatHoursMinutes(summary.comparison.workDeltaMinutes)}`
+                    : summary.comparison.workDeltaMinutes < 0
+                    ? `-${formatHoursMinutes(Math.abs(summary.comparison.workDeltaMinutes))}`
+                    : 'no change'}
+                </span>
+              </div>
+
+              {summary.comparison.deltas.map((d) => (
+                <div key={d.category} className="week-comparison-row" role="listitem">
+                  <span className="week-comparison-label">{d.category}</span>
+                  <span className="week-comparison-delta">
+                    {d.deltaMinutes > 0
+                      ? `+${formatHoursMinutes(d.deltaMinutes)}`
+                      : `-${formatHoursMinutes(Math.abs(d.deltaMinutes))}`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
       {/* 6.6 Day by day */}
       {(loading || summary.loggedMs > 0) && (
         <Card className="week-days-card">
@@ -447,6 +536,78 @@ export const WeekPage: React.FC = () => {
               );
             })}
           </div>
+        </Card>
+      )}
+
+      {/* 6.7 Company kept */}
+      {(loading || summary.loggedMs > 0) && !summary.isAllVacation && (
+        <Card className="week-company-card">
+          <div className="week-card-header">
+            <h3 className="section-title">Company kept</h3>
+          </div>
+
+          <div className="week-company-list" role="list">
+            {summary.people.map((p) => (
+              <div key={p.name} className="week-company-row" role="listitem">
+                <span className="week-company-name">{p.name}</span>
+                <span className="week-company-time">{formatHoursMinutes(p.minutes)}</span>
+              </div>
+            ))}
+
+            <div className="week-company-row week-company-alone-row" role="listitem">
+              <span className="week-company-name">Alone</span>
+              <span className="week-company-time">{formatHoursMinutes(summary.aloneMinutes)}</span>
+            </div>
+          </div>
+
+          <p className="week-company-note">
+            Segments with multiple people count fully toward each person.
+          </p>
+        </Card>
+      )}
+
+      {/* 6.8 Unlogged stretches */}
+      {(loading || summary.loggedMs > 0) && summary.gaps.length > 0 && (
+        <Card className="week-gaps-card">
+          <button
+            type="button"
+            className="week-gaps-header-btn"
+            onClick={() => setGapsExpanded(!gapsExpanded)}
+            aria-expanded={gapsExpanded}
+            aria-controls="week-gaps-list"
+          >
+            <h3 className="section-title week-gaps-title">
+              Unlogged stretches ({summary.gaps.length},{' '}
+              {formatHoursMinutes(summary.gaps.reduce((acc, g) => acc + g.minutes, 0))})
+            </h3>
+            <svg
+              className={`week-gaps-chevron ${gapsExpanded ? 'week-gaps-chevron-open' : ''}`}
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+
+          {gapsExpanded && (
+            <div id="week-gaps-list" className="week-gaps-list" role="list">
+              {summary.gaps.map((gap, gIdx) => (
+                <div key={gIdx} className="week-gap-row" role="listitem">
+                  <span className="week-gap-label">
+                    {formatGapRange(gap.start, gap.end, timeZone)}
+                  </span>
+                  <span className="week-gap-time">{formatHoursMinutes(gap.minutes)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </Card>
       )}
 

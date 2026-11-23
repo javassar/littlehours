@@ -232,6 +232,26 @@ export function formatDecimalHours(totalMinutes: number): string {
 }
 
 /**
+ * Format gap date and time range: "Tue 2:10 PM to 4:45 PM" (Section 6.8).
+ */
+export function formatGapRange(start: Date, end: Date, timeZone: string = 'America/Phoenix'): string {
+  const startDay = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone }).format(start);
+  const endDay = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone }).format(end);
+  const timeFormatter = new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone,
+  });
+  const startTime = timeFormatter.format(start);
+  const endTime = timeFormatter.format(end);
+
+  if (startDay === endDay) {
+    return `${startDay} ${startTime} to ${endTime}`;
+  }
+  return `${startDay} ${startTime} to ${endDay} ${endTime}`;
+}
+
+/**
  * Format the week selector date range label, e.g. "Nov 16 to Nov 22" or "Oct 26 to Nov 1".
  */
 export function formatWeekDateRange(weekStart: Date, timeZone: string): string {
@@ -710,7 +730,9 @@ export function computeWeekSummary(params: ComputeWeekSummaryParams): WeekSummar
     if (sl.isVacation) continue;
 
     const dur = sl.endMs - sl.startMs;
-    const cleanCompany = (sl.company || []).map((n) => n.trim()).filter(Boolean);
+    const cleanCompany = (sl.company || [])
+      .map((n) => n.trim().replace(/\s+/g, ' '))
+      .filter(Boolean);
 
     if (cleanCompany.length === 0) {
       aloneMs += dur;
@@ -725,6 +747,9 @@ export function computeWeekSummary(params: ComputeWeekSummaryParams): WeekSummar
         const existing = personMsMap.get(lower);
         if (existing) {
           existing.ms += dur;
+          if (rawName !== lower && existing.canonical === lower) {
+            existing.canonical = rawName;
+          }
         } else {
           personMsMap.set(lower, { ms: dur, canonical: rawName });
         }

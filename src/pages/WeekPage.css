@@ -500,6 +500,190 @@
   flex-shrink: 0;
 }
 
+/* 6.3 Data quality notice */
+.week-quality-notice-card {
+  background-color: rgba(217, 165, 174, 0.22);
+  border: 1px solid rgba(184, 114, 127, 0.35);
+  border-radius: var(--radius-card);
+  padding: 14px 18px;
+  box-sizing: border-box;
+  min-width: 0;
+  box-shadow: 0 1px 3px rgba(75, 51, 64, 0.05);
+}
+
+.week-quality-notice-items {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.week-quality-notice-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+}
+
+.week-quality-notice-text {
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink);
+  flex: 1;
+  min-width: 180px;
+}
+
+.week-notice-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: var(--radius-button);
+  border: 1px solid var(--rose-deep);
+  color: var(--rose-deep);
+  background-color: var(--surface);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  flex-shrink: 0;
+  min-width: 44px;
+  min-height: 44px;
+  box-sizing: border-box;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.week-notice-action-btn:hover {
+  background-color: rgba(217, 165, 174, 0.2);
+  color: var(--ink);
+}
+
+/* 6.5 Against last week */
+.week-comparison-card,
+.week-company-card,
+.week-gaps-card {
+  padding: 18px 20px;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.week-comparison-notice {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--mauve);
+  font-style: italic;
+  margin: 0;
+}
+
+.week-comparison-list,
+.week-company-list,
+.week-gaps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.week-comparison-row,
+.week-company-row,
+.week-gap-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  min-width: 0;
+  gap: 12px;
+}
+
+.week-comparison-work-row {
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(184, 114, 127, 0.12);
+  margin-bottom: 2px;
+}
+
+.week-comparison-label,
+.week-company-name,
+.week-gap-label {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.week-comparison-delta,
+.week-company-time,
+.week-gap-time {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: oldstyle-nums;
+  flex-shrink: 0;
+  text-align: right;
+}
+
+/* 6.7 Company kept */
+.week-company-alone-row {
+  padding-top: 6px;
+  border-top: 1px dashed rgba(184, 114, 127, 0.2);
+  margin-top: 2px;
+}
+
+.week-company-note {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--mauve);
+  font-style: italic;
+  margin: 12px 0 0;
+  line-height: 1.4;
+}
+
+/* 6.8 Unlogged stretches */
+.week-gaps-header-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+  min-height: 44px;
+}
+
+.week-gaps-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.week-gaps-chevron {
+  color: var(--mauve);
+  transition: transform var(--transition-fast);
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.week-gaps-chevron-open {
+  transform: rotate(180deg);
+}
+
+.week-gaps-list {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(184, 114, 127, 0.12);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .week-bar-fill,
   .week-cat-bar-fill,
