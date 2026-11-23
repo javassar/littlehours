@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabase.ts';
-import starterCategoriesRaw from './starterCategories.json';
+import starterCategoriesRaw from './starterCategories.json' with { type: 'json' };
 
 export interface CategoryItem {
   name: string;
@@ -47,6 +47,7 @@ export interface UserSettings {
   snooze_until: string | null;
   categories: CategoryItem[];
   vacation_mode?: boolean;
+  work_report_categories?: string[];
 }
 
 /**
@@ -74,6 +75,10 @@ export async function ensureUserSettings(userId: string): Promise<UserSettings |
       return {
         ...existing,
         categories: normalizeCategories(existing.categories),
+        work_report_categories:
+          Array.isArray(existing.work_report_categories) && existing.work_report_categories.length > 0
+            ? existing.work_report_categories
+            : ['work'],
       } as UserSettings;
     }
 
@@ -87,6 +92,7 @@ export async function ensureUserSettings(userId: string): Promise<UserSettings |
       snooze_until: null,
       categories: STARTER_CATEGORIES,
       vacation_mode: false,
+      work_report_categories: ['work'],
     };
 
     const { data: created, error: insertError } = await supabase
@@ -166,6 +172,25 @@ export async function getCategoryUsageCount(userId: string, category: string): P
 }
 
 /**
+ * Milestone 4.1: Update work report categories in user settings
+ */
+export async function updateWorkReportCategories(
+  userId: string,
+  categories: string[]
+): Promise<void> {
+  const cleanCategories = categories.map((c) => c.trim().toLowerCase()).filter(Boolean);
+  const finalCategories = cleanCategories.length > 0 ? cleanCategories : ['work'];
+  const { error } = await supabase
+    .from('settings')
+    .update({ work_report_categories: finalCategories })
+    .eq('user_id', userId);
+
+  if (error) {
+    throw new Error(`Failed to update work report categories: ${error.message}`);
+  }
+}
+
+/**
  * Milestone 2.6 & 3.7: Rename a category across settings and all existing segments
  */
 export async function renameCategory(
@@ -201,6 +226,29 @@ export async function renameCategory(
     console.warn('Could not update segments for renamed category:', error.message);
   }
 
+  // 3. Update work_report_categories if present
+  try {
+    const { data: userSet } = await supabase
+      .from('settings')
+      .select('work_report_categories')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (userSet?.work_report_categories && Array.isArray(userSet.work_report_categories)) {
+      if (userSet.work_report_categories.map((c: string) => c.toLowerCase()).includes(cleanOld)) {
+        const updatedWork = userSet.work_report_categories.map((c: string) =>
+          c.toLowerCase() === cleanOld ? cleanNew : c
+        );
+        await supabase
+          .from('settings')
+          .update({ work_report_categories: updatedWork })
+          .eq('user_id', userId);
+      }
+    }
+  } catch (err) {
+    console.warn('Could not update work_report_categories for renamed category:', err);
+  }
+
   return {
     updatedCount: data?.length || 0,
     newCategories,
@@ -227,6 +275,30 @@ export async function deleteCategory(
   );
 
   await updateUserCategories(userId, newCategories);
+
+  // Update work_report_categories if it contains the deleted category
+  try {
+    const { data: userSet } = await supabase
+      .from('settings')
+      .select('work_report_categories')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (userSet?.work_report_categories && Array.isArray(userSet.work_report_categories)) {
+      if (userSet.work_report_categories.map((c: string) => c.toLowerCase()).includes(cleanCat)) {
+        const filteredWork = userSet.work_report_categories.filter(
+          (c: string) => c.toLowerCase() !== cleanCat
+        );
+        await supabase
+          .from('settings')
+          .update({ work_report_categories: filteredWork.length > 0 ? filteredWork : ['work'] })
+          .eq('user_id', userId);
+      }
+    }
+  } catch (err) {
+    console.warn('Could not update work_report_categories for deleted category:', err);
+  }
+
   return { success: true, newCategories };
 }
 
