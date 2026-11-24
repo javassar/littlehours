@@ -1,5 +1,5 @@
 .week-page-container {
-  padding: 12px 16px 36px;
+  padding: 28px 16px 36px;
   max-width: 460px;
   margin: 0 auto;
   display: flex;
@@ -94,6 +94,10 @@
   text-align: center;
 }
 
+.week-hero-card .card-body {
+  padding-bottom: 0;
+}
+
 .week-hero-header {
   margin-bottom: 6px;
 }
@@ -165,7 +169,7 @@
   justify-content: space-between;
   gap: 8px;
   padding: 12px 6px;
-  margin: 12px 0 16px;
+  margin: 12px 0 0;
   border-top: 1px solid rgba(184, 114, 127, 0.12);
   border-bottom: 1px solid rgba(184, 114, 127, 0.12);
 }
@@ -218,19 +222,22 @@
 .week-counting-line {
   display: flex;
   justify-content: center;
-  margin-bottom: 18px;
+  align-items: center;
+  padding-top: 14px;
+  padding-bottom: 18px;
+  margin: 0;
 }
 
 .week-counting-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  background-color: rgba(246, 237, 234, 0.65);
+  gap: 5px;
+  background-color: rgba(246, 237, 234, 0.7);
   border: 1px solid rgba(184, 114, 127, 0.25);
-  border-radius: var(--radius-button);
-  padding: 6px 14px;
-  min-height: 44px;
+  border-radius: 999px;
+  padding: 3px 10px;
+  line-height: 1.25;
   font-family: var(--font-body);
   font-size: 13px;
   color: var(--ink);
@@ -283,24 +290,21 @@
   border-style: solid;
 }
 
-/* Copy button */
-.week-copy-wrap {
-  display: flex;
-  justify-content: center;
-}
-
-.week-copy-btn {
-  min-width: 180px;
-  font-family: var(--font-body);
-  font-weight: 500;
-}
-
-/* 6.4 Where the hours went */
+/* 6.4 Where the hours went, 6.5 Against last week, 6.7 Company kept */
 .week-breakdown-card,
-.week-days-card {
-  padding: 18px 20px;
+.week-comparison-card,
+.week-company-card,
+.week-gaps-card {
+  padding: 0;
   box-sizing: border-box;
   min-width: 0;
+}
+
+.week-breakdown-card .card-body,
+.week-comparison-card .card-body,
+.week-company-card .card-body,
+.week-gaps-card .card-body {
+  padding: 18px 28px;
 }
 
 .week-card-header {
@@ -606,13 +610,6 @@
 }
 
 /* 6.5 Against last week */
-.week-comparison-card,
-.week-company-card,
-.week-gaps-card {
-  padding: 18px 20px;
-  box-sizing: border-box;
-  min-width: 0;
-}
 
 .week-comparison-notice {
   font-family: var(--font-body);

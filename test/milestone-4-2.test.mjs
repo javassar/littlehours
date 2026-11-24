@@ -34,12 +34,12 @@ console.log('[Check 1] Verifying 4th tab (Week), route /week, and 375px viewport
   assert(tabBarSource.includes("label: 'Week'"), "TabBar must have label 'Week'");
   assert(tabBarSource.includes('WeekIcon'), 'TabBar must render WeekIcon');
 
-  // Check tab order: Log, Week, History, Settings
+  // Check tab order: Log, History, Week, Settings
   const logIdx = tabBarSource.indexOf("label: 'Log'");
-  const weekIdx = tabBarSource.indexOf("label: 'Week'");
   const histIdx = tabBarSource.indexOf("label: 'History'");
+  const weekIdx = tabBarSource.indexOf("label: 'Week'");
   const setIdx = tabBarSource.indexOf("label: 'Settings'");
-  assert(logIdx < weekIdx && weekIdx < histIdx && histIdx < setIdx, 'Tab order must be Log, Week, History, Settings');
+  assert(logIdx < histIdx && histIdx < weekIdx && weekIdx < setIdx, 'Tab order must be Log, History, Week, Settings');
 
   // Check TabBar CSS width fits 375px
   const tabBarCss = fs.readFileSync('src/components/TabBar.css', 'utf-8');

@@ -152,7 +152,6 @@ console.log('\n[Check 4] Verifying Section 7 Accessibility checklist...');
   assert(pageContent.includes('week-bar-day-time'), 'Hero daily bars have visible text times');
   assert(pageContent.includes('week-cat-time'), 'Category bars have visible text times');
   assert(pageContent.includes('week-cat-share'), 'Category bars have visible text share percentage');
-  assert(pageContent.includes('week-day-time'), 'Day by day bars have visible text times');
 
   // 2. aria-label on charts & interactive items
   assert(pageContent.includes('role="img"') && pageContent.includes('aria-label='), 'Charts have aria-labels');

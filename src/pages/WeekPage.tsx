@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Card, Button, Swan, Toast, WorkCategoriesSheet, DayDetailSheet } from '../components';
+import { Card, Swan, Toast, WorkCategoriesSheet } from '../components';
 import { useAuth } from '../lib/auth';
 import {
   computeWeekSummary,
@@ -12,10 +12,8 @@ import {
   formatHoursMinutes,
   formatDecimalHours,
   formatGapRange,
-  generateReportText,
   getFeaturedCardTitle,
   WeekSummaryResult,
-  DaySummary,
 } from '../lib/weekSummary';
 import { fetchWeekReviewData, WeekReviewFetchedData } from '../lib/weekData';
 import './WeekPage.css';
@@ -48,11 +46,9 @@ export const WeekPage: React.FC = () => {
 
   const [fetchedData, setFetchedData] = useState<WeekReviewFetchedData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [copied, setCopied] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [workCategoriesSheetOpen, setWorkCategoriesSheetOpen] = useState(false);
   const [showAllCategories, setShowAllCategories] = useState(false);
-  const [selectedDayForSheet, setSelectedDayForSheet] = useState<DaySummary | null>(null);
   const [gapsExpanded, setGapsExpanded] = useState(false);
 
   // In-session featured categories (survives tab switches and week navigation, resets when app is closed)
@@ -158,41 +154,6 @@ export const WeekPage: React.FC = () => {
   const handleNextWeek = () => {
     if (isCurrentWeek) return;
     setSelectedWeekStart((prev) => getNextWeekStart(prev, timeZone));
-  };
-
-  // 6. Copy for my report
-  const handleCopyReport = async () => {
-    const text = generateReportText(summary, timeZone, hoursFormat);
-    let success = false;
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(text);
-        success = true;
-      }
-    } catch {
-      // Fallback
-    }
-
-    if (!success) {
-      try {
-        const textarea = document.createElement('textarea');
-        textarea.value = text;
-        textarea.style.position = 'fixed';
-        textarea.style.opacity = '0';
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-        success = true;
-      } catch (err) {
-        console.error('Copy fallback failed:', err);
-      }
-    }
-
-    if (success) {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
   };
 
   const longestFeaturedDay = Math.max(1, ...summary.featured.perDay);
@@ -355,18 +316,6 @@ export const WeekPage: React.FC = () => {
                 <polyline points="6 9 12 15 18 9" />
               </svg>
             </button>
-          </div>
-
-          {/* Copy for my report */}
-          <div className="week-copy-wrap">
-            <Button
-              variant="primary"
-              className="week-copy-btn"
-              onClick={handleCopyReport}
-              aria-label="Copy for my report"
-            >
-              {copied ? 'Copied' : 'Copy for my report'}
-            </Button>
           </div>
         </Card>
       )}
@@ -542,66 +491,6 @@ export const WeekPage: React.FC = () => {
         </Card>
       )}
 
-      {/* 6.6 Day by day */}
-      {(loading || summary.loggedMs > 0) && (
-        <Card className="week-days-card">
-          <div className="week-card-header">
-            <h3 className="section-title">Day by day</h3>
-          </div>
-
-          <div className="week-days-list" role="list">
-            {summary.byDay.map((day) => {
-              if (day.isFuture) {
-                return (
-                  <div
-                    key={day.date}
-                    className="week-day-row week-day-row-future"
-                    role="listitem"
-                    aria-label={`${day.dayLabel}, future day with nothing logged`}
-                  >
-                    <span className="week-day-label">{day.dayLabel}</span>
-                    <div className="week-day-bar-track week-day-bar-track-future" />
-                    <span className="week-day-time">—</span>
-                  </div>
-                );
-              }
-
-              return (
-                <button
-                  key={day.date}
-                  type="button"
-                  className="week-day-row-btn"
-                  onClick={() => setSelectedDayForSheet(day)}
-                  aria-label={`${day.dayLabel}: logged ${formatHoursMinutes(day.loggedMinutes)}. Tap to view day breakdown.`}
-                >
-                  <span className="week-day-label">{day.dayLabel}</span>
-
-                  <div className="week-day-bar-track">
-                    {day.byCategory.map((cat, cIdx) => {
-                      const segWidthPct = Math.min(100, (cat.minutes / 1440) * 100);
-                      return (
-                        <div
-                          key={cIdx}
-                          className="week-day-bar-seg"
-                          style={{
-                            width: `${segWidthPct}%`,
-                            backgroundColor: cat.color,
-                          }}
-                        />
-                      );
-                    })}
-                  </div>
-
-                  <span className="week-day-time">
-                    {formatHoursMinutes(day.loggedMinutes)}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </Card>
-      )}
-
       {/* 6.7 Company kept */}
       {(loading || summary.loggedMs > 0) && !summary.isAllVacation && (
         <Card className="week-company-card">
@@ -618,7 +507,7 @@ export const WeekPage: React.FC = () => {
             ))}
 
             <div className="week-company-row week-company-alone-row" role="listitem">
-              <span className="week-company-name">Alone</span>
+              <span className="week-company-name">Alone (waking hours)</span>
               <span className="week-company-time">{formatHoursMinutes(summary.aloneMinutes)}</span>
             </div>
           </div>
@@ -674,13 +563,6 @@ export const WeekPage: React.FC = () => {
         </Card>
       )}
 
-      {/* Day Detail Bottom Sheet */}
-      <DayDetailSheet
-        isOpen={Boolean(selectedDayForSheet)}
-        day={selectedDayForSheet}
-        onClose={() => setSelectedDayForSheet(null)}
-      />
-
       {/* Featured Categories Multi-select Sheet */}
       {user && (
         <WorkCategoriesSheet
@@ -688,6 +570,7 @@ export const WeekPage: React.FC = () => {
           userId={user.id}
           categories={fetchedData?.settings?.categories || []}
           selectedCategories={summary.featured.categoriesUsed}
+          showDescriptions={false}
           onClose={() => setWorkCategoriesSheetOpen(false)}
           onSelectionChanged={(newCats) => {
             setSessionFeaturedCategories(newCats);

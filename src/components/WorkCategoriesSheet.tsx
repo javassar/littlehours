@@ -16,6 +16,7 @@ export interface WorkCategoriesSheetProps {
   onSelectionChanged?: (newCategories: string[]) => void;
   onToast?: (msg: string) => void;
   mode?: 'view' | 'settings';
+  showDescriptions?: boolean;
 }
 
 export const WorkCategoriesSheet: React.FC<WorkCategoriesSheetProps> = ({
@@ -29,7 +30,10 @@ export const WorkCategoriesSheet: React.FC<WorkCategoriesSheetProps> = ({
   onSelectionChanged,
   onToast,
   mode = 'view',
+  showDescriptions,
 }) => {
+  const shouldShowDescriptions =
+    showDescriptions !== undefined ? showDescriptions : mode === 'settings';
   const categories = normalizeCategories(rawCategories);
   const initialList = initialSelectedCategories || initialWorkCategories;
   const [selected, setSelected] = useState<string[]>(
@@ -176,7 +180,7 @@ export const WorkCategoriesSheet: React.FC<WorkCategoriesSheetProps> = ({
                     />
                     <div className="work-cat-item-content">
                       <Chip label={cat.name} size="sm" />
-                      {cat.description && (
+                      {shouldShowDescriptions && cat.description && (
                         <span className="work-cat-item-desc">{cat.description}</span>
                       )}
                     </div>

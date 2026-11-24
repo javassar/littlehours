@@ -241,11 +241,7 @@ console.log('[Check 4] Day by day stacked bars & tapping a day opens bottom shee
   assert(sheetSrc.includes('Total logged: {formatHoursMinutes(day.loggedMinutes)}'),
     'DayDetailSheet must display total logged time'
   );
-
-  // Verify WeekPage wires DayDetailSheet
-  const weekPageSrc = fs.readFileSync('src/pages/WeekPage.tsx', 'utf-8');
-  assert(weekPageSrc.includes('<DayDetailSheet'), 'WeekPage must render DayDetailSheet');
-  assert(weekPageSrc.includes('setSelectedDayForSheet(day)'), 'Tapping day row must set selected day for sheet');
+  // Note: Day by day card removed from WeekPage per user preference, preserving DayDetailSheet component
 }
 console.log('✓ Check 4 passed: Day by day stacked bar data and DayDetailSheet confirmed.\n');
 

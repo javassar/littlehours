@@ -119,15 +119,16 @@
 
 .work-cat-item {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
-  padding: 10px 14px;
+  padding: 8px 14px;
   border-radius: 14px;
   background-color: rgba(246, 237, 234, 0.5);
   border: 1px solid rgba(184, 114, 127, 0.12);
   cursor: pointer;
   transition: background-color var(--transition-fast), border-color var(--transition-fast);
   min-height: 44px;
+  box-sizing: border-box;
 }
 
 .work-cat-item:hover {
@@ -140,7 +141,7 @@
 }
 
 .work-cat-checkbox {
-  margin-top: 3px;
+  margin-top: 0;
   accent-color: var(--rose-deep);
   width: 17px;
   height: 17px;

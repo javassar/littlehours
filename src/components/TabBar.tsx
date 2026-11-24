@@ -37,8 +37,8 @@ const SettingsIcon: React.FC<{ stroke: string }> = ({ stroke }) => (
 export const TabBar: React.FC = () => {
   const tabs = [
     { to: '/', label: 'Log', Icon: LogIcon },
-    { to: '/week', label: 'Week', Icon: WeekIcon },
     { to: '/history', label: 'History', Icon: HistoryIcon },
+    { to: '/week', label: 'Week', Icon: WeekIcon },
     { to: '/settings', label: 'Settings', Icon: SettingsIcon },
   ];
 
