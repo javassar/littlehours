@@ -337,7 +337,7 @@ export const WeekPage: React.FC = () => {
                       ? '1 segment is unchecked.'
                       : `${summary.quality.unconfirmedSegments} segments are unchecked.`}
                   </span>
-                  <Link to="/history" className="week-notice-action-btn">
+                  <Link to="/history?filter=unchecked" className="week-notice-action-btn">
                     Open History
                   </Link>
                 </div>

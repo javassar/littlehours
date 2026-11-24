@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Card,
   Button,
@@ -76,6 +77,40 @@ export const HistoryPage: React.FC = () => {
   // Toast feedback
   const [toastMessage, setToastMessage] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
+
+  // Unchecked logs filter
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filterParam = searchParams.get('filter');
+  const [showUncheckedOnly, setShowUncheckedOnly] = useState<boolean>(filterParam === 'unchecked');
+
+  useEffect(() => {
+    if (filterParam === 'unchecked') {
+      setShowUncheckedOnly(true);
+    }
+  }, [filterParam]);
+
+  const isEntryUnchecked = useCallback((entry: EntryItem) => {
+    return Boolean(
+      entry.segments &&
+      entry.segments.length > 0 &&
+      entry.segments.some((s) => !s.confirmed)
+    );
+  }, []);
+
+  const uncheckedCount = useMemo(() => {
+    return entries.filter(isEntryUnchecked).length;
+  }, [entries, isEntryUnchecked]);
+
+  const toggleUncheckedFilter = () => {
+    const next = !showUncheckedOnly;
+    setShowUncheckedOnly(next);
+    if (next) {
+      searchParams.set('filter', 'unchecked');
+    } else {
+      searchParams.delete('filter');
+    }
+    setSearchParams(searchParams, { replace: true });
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -711,8 +746,10 @@ export const HistoryPage: React.FC = () => {
   const dayGroups: DayGroup[] = [];
   const dayGroupMap = new Map<string, DayGroup>();
 
-  // 1. Add entries to day groups
-  entries.forEach((entry, idx) => {
+  // 1. Add entries to day groups (filtered to unchecked only if active)
+  const entriesToDisplay = showUncheckedOnly ? entries.filter(isEntryUnchecked) : entries;
+
+  entriesToDisplay.forEach((entry, idx) => {
     const endDate = new Date(entry.window_end);
     const key = getDayKey(endDate, timeZone);
 
@@ -735,28 +772,30 @@ export const HistoryPage: React.FC = () => {
   });
 
   // 2. Add standalone ratings (synced ones appear in day lists; queued standalone appear in Waiting to sync)
-  standaloneRatings
-    .filter((r) => !r.isQueued)
-    .forEach((rating) => {
-      const ratedAtDate = new Date(rating.rated_at);
-      const key = getDayKey(ratedAtDate, timeZone);
+  if (!showUncheckedOnly) {
+    standaloneRatings
+      .filter((r) => !r.isQueued)
+      .forEach((rating) => {
+        const ratedAtDate = new Date(rating.rated_at);
+        const key = getDayKey(ratedAtDate, timeZone);
 
-      if (!dayGroupMap.has(key)) {
-        const newGroup: DayGroup = {
-          heading: formatDayHeading(ratedAtDate, timeZone),
-          items: [],
-          ratingCount: 0,
-        };
-        dayGroupMap.set(key, newGroup);
-        dayGroups.push(newGroup);
-      }
+        if (!dayGroupMap.has(key)) {
+          const newGroup: DayGroup = {
+            heading: formatDayHeading(ratedAtDate, timeZone),
+            items: [],
+            ratingCount: 0,
+          };
+          dayGroupMap.set(key, newGroup);
+          dayGroups.push(newGroup);
+        }
 
-      dayGroupMap.get(key)!.items.push({
-        kind: 'rating',
-        rating,
-        timestamp: ratedAtDate.getTime(),
+        dayGroupMap.get(key)!.items.push({
+          kind: 'rating',
+          rating,
+          timestamp: ratedAtDate.getTime(),
+        });
       });
-    });
+  }
 
   // Sort day groups chronologically (most recent day first)
   dayGroups.sort((a, b) => {
@@ -785,8 +824,62 @@ export const HistoryPage: React.FC = () => {
       <div className="page-container screen-fade-in history-page">
       <Toast visible={toastVisible} message={toastMessage} onClose={() => setToastVisible(false)} />
 
+      {/* Filter Bar: Unchecked logs button */}
+      <div className="history-filter-bar">
+        <button
+          type="button"
+          className={`history-filter-toggle-btn ${showUncheckedOnly ? 'active' : ''}`}
+          onClick={toggleUncheckedFilter}
+          aria-pressed={showUncheckedOnly}
+          aria-label={
+            showUncheckedOnly
+              ? `Showing ${uncheckedCount} unchecked logs only. Click to show all logs.`
+              : `Show unchecked logs only (${uncheckedCount} unchecked)`
+          }
+        >
+          <span className="history-filter-dot" aria-hidden="true" />
+          <span>{showUncheckedOnly ? 'Showing unchecked logs' : 'Unchecked logs only'}</span>
+          <span className="history-filter-count-badge">{uncheckedCount}</span>
+        </button>
+
+        {showUncheckedOnly && (
+          <button
+            type="button"
+            className="history-filter-clear-btn"
+            onClick={() => {
+              setShowUncheckedOnly(false);
+              searchParams.delete('filter');
+              setSearchParams(searchParams, { replace: true });
+            }}
+            aria-label="Show all logs"
+          >
+            Show all
+          </button>
+        )}
+      </div>
+
+      {/* When filtering to unchecked only and none are unchecked */}
+      {showUncheckedOnly && uncheckedCount === 0 && (
+        <div className="empty-history-state" style={{ padding: '36px 20px', textAlign: 'center' }}>
+          <Deer size={80} />
+          <p className="empty-history-text" style={{ margin: '16px 0 12px' }}>
+            No unchecked logs! All parsed entries have been confirmed.
+          </p>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setShowUncheckedOnly(false);
+              searchParams.delete('filter');
+              setSearchParams(searchParams, { replace: true });
+            }}
+          >
+            Show all entries
+          </Button>
+        </div>
+      )}
+
       {/* 1. Queued offline entries and ratings shown at the very top with "Waiting to sync" badge */}
-      {(queuedEntries.length > 0 || queuedRatings.filter((r) => !r.entry_id).length > 0) && (
+      {!showUncheckedOnly && (queuedEntries.length > 0 || queuedRatings.filter((r) => !r.entry_id).length > 0) && (
         <section className="history-day-section history-queued-section">
           <h2 className="history-day-heading" style={{ color: 'var(--mauve)' }}>
             Waiting to sync ({queuedEntries.length + queuedRatings.filter((r) => !r.entry_id).length})
