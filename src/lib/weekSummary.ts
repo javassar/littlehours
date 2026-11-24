@@ -270,7 +270,32 @@ export function formatWeekDateRange(weekStart: Date, timeZone: string): string {
 }
 
 /**
- * Generates the plain text block for "Copy for my report" (Section 6.2).
+ * Resolves the hero card title and comparison label according to Section 4:
+ * - exactly ["work"]: "Hours worked" ("Hours worked so far" for current week)
+ * - 1 other category (e.g. reading): "Time on reading" ("Time on reading so far" for current week)
+ * - 2 or 3 categories: "Time on work, job search" ("Time on work, job search so far" for current week)
+ * - 4 or more: "Time on 4 categories" ("Time on 4 categories so far" for current week)
+ */
+export function getFeaturedCardTitle(categories: string[], isCurrentWeek: boolean = false): string {
+  const clean = categories.map((c) => c.trim().toLowerCase());
+  if (clean.length === 1 && clean[0] === 'work') {
+    return isCurrentWeek ? 'Hours worked so far' : 'Hours worked';
+  }
+  let base: string;
+  if (clean.length === 0) {
+    base = 'Time on featured';
+  } else if (clean.length === 1) {
+    base = `Time on ${clean[0]}`;
+  } else if (clean.length === 2 || clean.length === 3) {
+    base = `Time on ${clean.join(', ')}`;
+  } else {
+    base = `Time on ${clean.length} categories`;
+  }
+  return isCurrentWeek ? `${base} so far` : base;
+}
+
+/**
+ * Generates the plain text block for "Copy for my report" (Section 6.2 and change spec).
  */
 export function generateReportText(
   summary: WeekSummaryResult,
@@ -278,13 +303,34 @@ export function generateReportText(
   hoursFormat: 'hours_minutes' | 'decimal' = 'hours_minutes'
 ): string {
   const rangeStr = formatWeekDateRange(summary.weekStart, timeZone);
+  const totalMin = summary.featured ? summary.featured.totalMinutes : summary.work.totalMinutes;
   const totalStr =
     hoursFormat === 'decimal'
-      ? formatDecimalHours(summary.work.totalMinutes)
-      : formatHoursMinutes(summary.work.totalMinutes);
+      ? formatDecimalHours(totalMin)
+      : formatHoursMinutes(totalMin);
 
+  const cats = (summary.featured ? summary.featured.categoriesUsed : summary.work.categoriesUsed) || [];
+  const clean = cats.map((c) => c.trim().toLowerCase());
+
+  let labelLine: string;
+  let extraCategoriesLine: string | null = null;
+
+  if (clean.length === 1 && clean[0] === 'work') {
+    labelLine = `Hours worked: ${totalStr}`;
+  } else if (clean.length === 1) {
+    labelLine = `Time on ${clean[0]}: ${totalStr}`;
+  } else if (clean.length === 2 || clean.length === 3) {
+    labelLine = `Time on ${clean.join(', ')}: ${totalStr}`;
+  } else if (clean.length >= 4) {
+    labelLine = `Time on ${clean.length} categories: ${totalStr}`;
+    extraCategoriesLine = `Categories: ${clean.join(', ')}`;
+  } else {
+    labelLine = `Featured time: ${totalStr}`;
+  }
+
+  const perDay = (summary.featured ? summary.featured.perDay : summary.work.perDay) || [0, 0, 0, 0, 0, 0, 0];
   const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const dayLines = summary.work.perDay.map((min, idx) => {
+  const dayLines = perDay.map((min, idx) => {
     const formatted =
       hoursFormat === 'decimal'
         ? formatDecimalHours(min)
@@ -292,11 +338,16 @@ export function generateReportText(
     return `${dayNames[idx]} ${formatted}`;
   });
 
-  return [
+  const lines = [
     `Week of ${rangeStr}`,
-    `Hours worked: ${totalStr}`,
-    ...dayLines,
-  ].join('\n');
+    labelLine,
+  ];
+  if (extraCategoriesLine) {
+    lines.push(extraCategoriesLine);
+  }
+  lines.push(...dayLines);
+
+  return lines.join('\n');
 }
 
 /**
@@ -369,6 +420,7 @@ export interface ComputeWeekSummaryParams {
   weekStart: Date;
   now?: Date;
   previousSegments?: WeekSummaryInputSegment[];
+  featuredCategories?: string[];
 }
 
 export interface CategorySummary {
@@ -385,7 +437,8 @@ export interface DaySummary {
   dayLabel: string; // e.g. "Mon 16"
   fullHeading: string; // e.g. "Monday, November 16"
   loggedMinutes: number;
-  workMinutes: number;
+  featuredMinutes: number;
+  workMinutes: number; // alias
   byCategory: Array<{ category: string; color: string; minutes: number }>;
   isFuture: boolean;
 }
@@ -409,6 +462,7 @@ export interface CategoryDelta {
 export interface ComparisonSummary {
   available: boolean;
   deltas: CategoryDelta[];
+  featuredDeltaMinutes: number;
   workDeltaMinutes: number;
   reason?: string;
 }
@@ -428,12 +482,15 @@ export interface CoverageSummary {
   text: string;
 }
 
-export interface WorkSummary {
+export interface FeaturedSummary {
   totalMinutes: number;
   perDay: [number, number, number, number, number, number, number];
   categoriesUsed: string[];
   missingCategories: string[];
+  noValidCategories?: boolean;
 }
+
+export type WorkSummary = FeaturedSummary;
 
 export interface WeekSummaryResult {
   weekStart: Date;
@@ -444,7 +501,8 @@ export interface WeekSummaryResult {
   vacationMs: number;
   countedMs: number;
   coverage: CoverageSummary;
-  work: WorkSummary;
+  featured: FeaturedSummary;
+  work: FeaturedSummary; // alias for backwards compatibility
   byCategory: CategorySummary[];
   byDay: DaySummary[];
   people: PersonSummary[];
@@ -633,28 +691,54 @@ export function computeWeekSummary(params: ComputeWeekSummaryParams): WeekSummar
     });
   }
 
-  // 6. Work Categories & Work Totals
-  const rawWorkCats = settings.work_report_categories && settings.work_report_categories.length > 0
-    ? settings.work_report_categories
-    : ['work'];
-  const workCategories = rawWorkCats.map((c) => c.trim().toLowerCase());
+  // 6. Featured Categories & Featured Totals
+  const rawFeaturedCats = params.featuredCategories && params.featuredCategories.length > 0
+    ? params.featuredCategories
+    : (settings.work_report_categories && settings.work_report_categories.length > 0
+        ? settings.work_report_categories
+        : ['work']);
+  const cleanFeatured = rawFeaturedCats.map((c) => c.trim().toLowerCase());
 
   // Check missing categories
+  const hasSettingsCategories = Boolean(settings.categories && settings.categories.length > 0);
   const existingCategoryNames = new Set(
     (settings.categories || []).map((c) => c.name.trim().toLowerCase())
   );
-  const missingCategories = settings.categories && settings.categories.length > 0
-    ? workCategories.filter((c) => !existingCategoryNames.has(c))
+  const missingCategories = hasSettingsCategories
+    ? cleanFeatured.filter((c) => !existingCategoryNames.has(c))
     : [];
-  const categoriesUsed = workCategories.filter((c) => !missingCategories.includes(c));
 
-  // Compute day work minutes with day-level rounding
+  let categoriesUsed = hasSettingsCategories
+    ? cleanFeatured.filter((c) => existingCategoryNames.has(c))
+    : cleanFeatured;
+
+  let noValidCategories = false;
+  if (hasSettingsCategories && categoriesUsed.length === 0) {
+    if (existingCategoryNames.has('work')) {
+      categoriesUsed = ['work'];
+    } else {
+      categoriesUsed = [];
+      noValidCategories = true;
+    }
+  }
+
+  // Vacation rule: vacation time does not count toward the featured total,
+  // unless vacation itself is one of the featured categories.
+  const isVacationFeatured = categoriesUsed.includes('vacation');
+  const sliceCountsForFeatured = (sl: { category: string; isVacation: boolean }): boolean => {
+    if (sl.isVacation) {
+      return isVacationFeatured;
+    }
+    return categoriesUsed.includes(sl.category);
+  };
+
+  // Compute day featured minutes with day-level rounding
   const perDay: [number, number, number, number, number, number, number] = [0, 0, 0, 0, 0, 0, 0];
   const byDay: DaySummary[] = [];
 
   for (let i = 0; i < 7; i++) {
     const b = dayBounds[i];
-    let dayWorkMs = 0;
+    let dayFeaturedMs = 0;
     let dayLoggedMs = 0;
     const catMsMap = new Map<string, number>();
 
@@ -664,16 +748,16 @@ export function computeWeekSummary(params: ComputeWeekSummaryParams): WeekSummar
       if (overlapEnd > overlapStart) {
         const dur = overlapEnd - overlapStart;
         dayLoggedMs += dur;
-        if (!sl.isVacation && categoriesUsed.includes(sl.category)) {
-          dayWorkMs += dur;
+        if (sliceCountsForFeatured(sl)) {
+          dayFeaturedMs += dur;
         }
         const effectiveCat = sl.isVacation ? 'vacation' : sl.category;
         catMsMap.set(effectiveCat, (catMsMap.get(effectiveCat) || 0) + dur);
       }
     }
 
-    const roundedWork = Math.round(dayWorkMs / 60000);
-    perDay[i] = roundedWork;
+    const roundedFeatured = Math.round(dayFeaturedMs / 60000);
+    perDay[i] = roundedFeatured;
 
     const dayByCat: Array<{ category: string; color: string; minutes: number }> = [];
     for (const [cat, ms] of catMsMap.entries()) {
@@ -692,14 +776,15 @@ export function computeWeekSummary(params: ComputeWeekSummaryParams): WeekSummar
       dayLabel: b.dayLabel,
       fullHeading: b.fullHeading,
       loggedMinutes: Math.round(dayLoggedMs / 60000),
-      workMinutes: roundedWork,
+      featuredMinutes: roundedFeatured,
+      workMinutes: roundedFeatured,
       byCategory: dayByCat,
       isFuture: b.isFuture,
     });
   }
 
-  // Work total minutes is sum of rounded per-day minutes
-  const totalWorkMinutes = perDay.reduce((sum, m) => sum + m, 0);
+  // Featured total minutes is sum of rounded per-day minutes
+  const totalFeaturedMinutes = perDay.reduce((sum, m) => sum + m, 0);
 
   // 7. Category Breakdown (Non-vacation only)
   const categoryMsMap = new Map<string, number>();
@@ -842,6 +927,7 @@ export function computeWeekSummary(params: ComputeWeekSummaryParams): WeekSummar
   let comparison: ComparisonSummary = {
     available: false,
     deltas: [],
+    featuredDeltaMinutes: 0,
     workDeltaMinutes: 0,
   };
 
@@ -871,14 +957,14 @@ export function computeWeekSummary(params: ComputeWeekSummaryParams): WeekSummar
 
     const prevSlices = reconcileSlices(prevClipped);
     let prevLoggedMs = 0;
-    let prevWorkMs = 0;
+    let prevFeaturedMs = 0;
     const prevCatMsMap = new Map<string, number>();
 
     for (const sl of prevSlices) {
       const dur = sl.endMs - sl.startMs;
       prevLoggedMs += dur;
-      if (!sl.isVacation && categoriesUsed.includes(sl.category)) {
-        prevWorkMs += dur;
+      if (sliceCountsForFeatured(sl)) {
+        prevFeaturedMs += dur;
       }
       if (!sl.isVacation) {
         prevCatMsMap.set(sl.category, (prevCatMsMap.get(sl.category) || 0) + dur);
@@ -887,8 +973,8 @@ export function computeWeekSummary(params: ComputeWeekSummaryParams): WeekSummar
 
     const prevLoggedHours = prevLoggedMs / (3600 * 1000);
     if (prevLoggedHours >= MIN_COMPARISON_HOURS) {
-      const prevWorkMin = Math.round(prevWorkMs / 60000);
-      const workDeltaMinutes = totalWorkMinutes - prevWorkMin;
+      const prevFeaturedMin = Math.round(prevFeaturedMs / 60000);
+      const featuredDeltaMinutes = totalFeaturedMinutes - prevFeaturedMin;
 
       // Collect all categories across both weeks
       const allCategories = new Set([...categoryMsMap.keys(), ...prevCatMsMap.keys()]);
@@ -909,12 +995,14 @@ export function computeWeekSummary(params: ComputeWeekSummaryParams): WeekSummar
       comparison = {
         available: true,
         deltas: deltas.slice(0, 5),
-        workDeltaMinutes,
+        featuredDeltaMinutes,
+        workDeltaMinutes: featuredDeltaMinutes,
       };
     } else {
       comparison = {
         available: false,
         deltas: [],
+        featuredDeltaMinutes: 0,
         workDeltaMinutes: 0,
         reason: 'Last week has too little data to compare.',
       };
@@ -945,6 +1033,14 @@ export function computeWeekSummary(params: ComputeWeekSummaryParams): WeekSummar
     unsyncedChanges: settings.unsyncedChanges || 0,
   };
 
+  const featuredObj: FeaturedSummary = {
+    totalMinutes: totalFeaturedMinutes,
+    perDay,
+    categoriesUsed,
+    missingCategories,
+    noValidCategories,
+  };
+
   return {
     weekStart,
     weekEnd,
@@ -954,12 +1050,8 @@ export function computeWeekSummary(params: ComputeWeekSummaryParams): WeekSummar
     vacationMs,
     countedMs,
     coverage,
-    work: {
-      totalMinutes: totalWorkMinutes,
-      perDay,
-      categoriesUsed,
-      missingCategories,
-    },
+    featured: featuredObj,
+    work: featuredObj,
     byCategory,
     byDay,
     people,

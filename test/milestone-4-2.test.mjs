@@ -128,12 +128,13 @@ console.log('[Check 3] Hours worked total matches the sum of work segments in Hi
     settings: { timezone: TZ_PHX, work_report_categories: ['work'] },
   });
 
-  const totalWorkMin = summary.work.totalMinutes;
+  const totalWorkMin = summary.featured.totalMinutes;
   assert.strictEqual(totalWorkMin, 2265, 'Total work minutes must be 2265 (37h 45m)');
   assert.strictEqual(formatHoursMinutes(totalWorkMin), '37h 45m');
   assert.strictEqual(formatDecimalHours(totalWorkMin), '37.75 hours');
 
-  assert.deepStrictEqual(summary.work.perDay, [480, 450, 495, 420, 420, 0, 0], 'Daily work minutes must match Mon-Sun breakdown');
+  assert.deepStrictEqual(summary.featured.perDay, [480, 450, 495, 420, 420, 0, 0], 'Daily work minutes must match Mon-Sun breakdown');
+  assert.strictEqual(summary.work.totalMinutes, 2265, 'Work alias matches featured');
 }
 console.log('✓ Check 3 passed: 37h 45m matches sum of work segments exactly.\n');
 
@@ -207,7 +208,7 @@ console.log('[Check 5] Changing work categories in Settings changes the hero num
     segments,
     settings: { timezone: TZ_PHX, work_report_categories: ['work'] },
   });
-  assert.strictEqual(summary1.work.totalMinutes, 2265, 'Initial work total: 37h 45m');
+  assert.strictEqual(summary1.featured.totalMinutes, 2265, 'Initial work total: 37h 45m');
 
   // 2. User adds 'job search' in Settings
   const summary2 = computeWeekSummary({
@@ -216,9 +217,9 @@ console.log('[Check 5] Changing work categories in Settings changes the hero num
     segments,
     settings: { timezone: TZ_PHX, work_report_categories: ['work', 'job search'] },
   });
-  assert.strictEqual(summary2.work.totalMinutes, 2265 + 300, 'Work total with job search: 42h 45m (2565m)');
-  assert.strictEqual(formatHoursMinutes(summary2.work.totalMinutes), '42h 45m');
-  assert.strictEqual(summary2.work.perDay[5], 300, 'Saturday work now includes 5h (300m) of job search');
+  assert.strictEqual(summary2.featured.totalMinutes, 2265 + 300, 'Work total with job search: 42h 45m (2565m)');
+  assert.strictEqual(formatHoursMinutes(summary2.featured.totalMinutes), '42h 45m');
+  assert.strictEqual(summary2.featured.perDay[5], 300, 'Saturday work now includes 5h (300m) of job search');
 }
 console.log('✓ Check 5 passed: Adding "job search" in settings increases work total from 37h 45m to 42h 45m.\n');
 
@@ -244,9 +245,9 @@ console.log('[Check 6] Empty state and Settings "Hours I report to my workplace"
   assert(weekPageSource.includes('Nothing logged this week yet.'), 'WeekPage must display empty state message');
   assert(weekPageSource.includes('<Swan'), 'WeekPage must display Swan illustration in empty state');
 
-  // Verify SettingsPage has "Hours I report to my workplace"
+  // Verify SettingsPage has "Default featured categories"
   const settingsSource = fs.readFileSync('src/pages/SettingsPage.tsx', 'utf-8');
-  assert(settingsSource.includes('Hours I report to my workplace'), 'SettingsPage must have Hours I report section');
+  assert(settingsSource.includes('Default featured categories'), 'SettingsPage must have Default featured categories section');
   assert(settingsSource.includes('WorkCategoriesSheet'), 'SettingsPage must render WorkCategoriesSheet');
 }
 console.log('✓ Check 6 passed: Empty state and Settings row verified.\n');

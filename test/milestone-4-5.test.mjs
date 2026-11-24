@@ -50,7 +50,8 @@ console.log('[Check 1] Demo sandbox seed data covers 14 days with comparison sec
 
   // Previous week must be fully populated (168h logged)
   assert.strictEqual(prevWeekSummary.loggedMs, 168 * 3600 * 1000, 'Previous week must have 168h logged time');
-  assert(prevWeekSummary.work.totalMinutes > 0, 'Previous week must contain work minutes');
+  assert(prevWeekSummary.featured.totalMinutes > 0, 'Previous week must contain featured/work minutes');
+  assert(prevWeekSummary.work.totalMinutes > 0, 'Work alias must also match');
   assert(prevWeekSummary.byCategory.length >= 8, 'Previous week must contain diverse categories');
   assert(prevWeekSummary.people.length > 0, 'Previous week must contain people/social companions');
 

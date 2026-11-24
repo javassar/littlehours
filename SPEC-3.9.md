@@ -332,3 +332,32 @@ Write unit tests for `computeWeekSummary` covering:
 - Pain rating summaries on this screen.
 - Exporting the week as CSV. The existing export covers the underlying data.
 - Goals, streaks, scores, or any judgment of how the week went.
+
+## Change: featured categories
+
+The hero card at the top of Week in Review can now feature any category or combination of categories, rather than solely work hours. "work" remains the default.
+
+Summary of changes:
+1. **Hero Card**:
+   - The line under the big number ("Counting: work ▾") is a tappable control with a small down-arrow.
+   - Tapping it opens a bottom sheet listing every category with a checkbox and colored dot.
+   - At least one category must stay selected (the last remaining selected category checkbox is disabled).
+   - In-session selections apply immediately to the view and persist across week navigation and tab switches while the app is open (resets to saved default when the app is closed).
+   - The sheet includes a "Make this my default" text button that saves the selection to Settings and confirms with "Saved as default".
+   - The big number, daily bars, h/m vs decimal toggle, and Copy button all reflect the featured selection.
+2. **Settings**:
+   - The row is renamed from "Hours I report to my workplace" to "Default featured categories", with description: "The categories shown at the top of Week in Review. Choose work if you report your hours to a workplace."
+   - Reuses the existing `work_report_categories` database column.
+3. **Calculation Module**:
+   - The calculation result is renamed to `featured` (with `work` retained as a backwards-compatible alias).
+   - The list of featured categories is passed as an input parameter from the screen.
+   - Vacation rule: vacation time does not count toward the featured total unless vacation itself is one of the featured categories.
+   - Week-over-week comparison first line reflects the featured selection.
+4. **Wording**:
+   - Exactly `["work"]`: "Hours worked" ("Hours worked so far" for current week). Copy text starts with "Hours worked: XXh YYm" matching workplace reporting.
+   - Single other category: "Time on {category}" (e.g. "Time on reading").
+   - Two or three categories: "Time on {cat1}, {cat2}".
+   - Four or more categories: "Time on {N} categories", with an extra line listing category names in the report text.
+   - Zero logged: "Nothing logged in {label} this week."
+5. **Edge Cases**:
+   - If a featured category is deleted or renamed, it is ignored in math and a small notice is shown: "Some categories no longer exist. Check Settings." If none exist, falls back to `work` if present, or prompts: "Choose a category to feature."

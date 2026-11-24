@@ -50,7 +50,7 @@ Little Hours is an offline-first progressive web app for logging daily activitie
 
 ### Deterministic Week in Review Analysis
 - **Zero LLM cost & client-side determinism**: Weekly metrics on the "Week in Review" screen are computed completely client-side from existing timeline segments using pure, deterministic TypeScript code—with **no LLM calls and zero external API dependencies**.
-- **Accurate workplace reporting**: Handles timezone-aware boundary clipping, day-level rounding, overlap reconciliation, companion tracking, gap detection, and week-over-week comparisons. Users can configure which categories count toward their reported hours, toggle between hours-and-minutes and decimal format, and copy their report in one tap.
+- **Accurate workplace reporting & flexible featured categories**: Handles timezone-aware boundary clipping, day-level rounding, overlap reconciliation, companion tracking, gap detection, and week-over-week comparisons. Users can feature any categories on their hero card (defaulting to work for workplace reporting), switch selections on the fly or save in settings, toggle between hours-and-minutes and decimal format, and copy their report in one tap.
 
 ### Ephemeral Demo Sandboxes
 - **Visitor isolation**: Portfolio visitors can test the full application without creating an account. The demo provisions a temporary anonymous Supabase user pre-seeded with 14 days of realistic time data matching the visitor's local timezone (with work segments on weekdays to showcase a full week review and week-over-week comparison).

@@ -148,6 +148,15 @@
   flex-shrink: 0;
 }
 
+.work-cat-checkbox:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.work-cat-item-locked {
+  cursor: default;
+}
+
 .work-cat-item-content {
   display: flex;
   flex-direction: column;
@@ -164,6 +173,59 @@
 
 .work-cat-actions {
   margin-top: 8px;
+}
+
+.work-cat-view-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.work-cat-default-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.work-cat-make-default-btn {
+  background: none;
+  border: none;
+  color: var(--rose-deep);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  padding: 10px 4px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color var(--transition-fast);
+}
+
+.work-cat-make-default-btn:hover {
+  color: var(--ink);
+}
+
+.work-cat-make-default-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.work-cat-saved-badge {
+  color: var(--mauve);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-style: italic;
+  animation: workCatFadeIn var(--transition-fast);
+}
+
+.work-cat-done-btn {
+  min-width: 90px;
 }
 
 @media (prefers-reduced-motion: reduce) {

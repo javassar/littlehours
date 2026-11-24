@@ -1032,22 +1032,22 @@ export const SettingsPage: React.FC = () => {
         />
       )}
 
-      {/* Hours I report to my workplace (Milestone 4.2) */}
+      {/* Default featured categories */}
       <Card className="settings-card mb-4">
         <div className="settings-section-header">
           <h3 className="section-title" style={{ margin: 0 }}>
-            Hours I report to my workplace
+            Default featured categories
           </h3>
           <Button
             variant="secondary"
             onClick={() => setWorkCategoriesSheetOpen(true)}
-            aria-label="Change reported work categories"
+            aria-label="Change default featured categories"
           >
             Change
           </Button>
         </div>
         <p className="section-desc" style={{ marginBottom: 12 }}>
-          Choose which categories count toward your reported work hours on the Week in Review screen.
+          The categories shown at the top of Week in Review. Choose work if you report your hours to a workplace.
         </p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
           {workReportCategories.map((catName) => (
@@ -1062,13 +1062,14 @@ export const SettingsPage: React.FC = () => {
           isOpen={workCategoriesSheetOpen}
           userId={user.id}
           categories={categories}
-          workCategories={workReportCategories}
+          selectedCategories={workReportCategories}
           onClose={() => setWorkCategoriesSheetOpen(false)}
           onWorkCategoriesUpdated={(newCats) => {
             setWorkReportCategories(newCats);
             refreshSettings?.();
           }}
           onToast={showToast}
+          mode="settings"
         />
       )}
 

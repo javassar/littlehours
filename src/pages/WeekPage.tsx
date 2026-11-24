@@ -13,11 +13,29 @@ import {
   formatDecimalHours,
   formatGapRange,
   generateReportText,
+  getFeaturedCardTitle,
   WeekSummaryResult,
   DaySummary,
 } from '../lib/weekSummary';
 import { fetchWeekReviewData, WeekReviewFetchedData } from '../lib/weekData';
 import './WeekPage.css';
+
+const SESSION_STORAGE_FEATURED_KEY = 'littlehours_session_featured_categories';
+
+function getSessionFeaturedCategories(): string[] | null {
+  try {
+    const raw = sessionStorage.getItem(SESSION_STORAGE_FEATURED_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.map((c: string) => c.trim().toLowerCase());
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
 
 export const WeekPage: React.FC = () => {
   const { user } = useAuth();
@@ -36,6 +54,11 @@ export const WeekPage: React.FC = () => {
   const [showAllCategories, setShowAllCategories] = useState(false);
   const [selectedDayForSheet, setSelectedDayForSheet] = useState<DaySummary | null>(null);
   const [gapsExpanded, setGapsExpanded] = useState(false);
+
+  // In-session featured categories (survives tab switches and week navigation, resets when app is closed)
+  const [sessionFeaturedCategories, setSessionFeaturedCategories] = useState<string[] | null>(
+    getSessionFeaturedCategories
+  );
 
   // 2. Format toggle (stored in localStorage)
   const [hoursFormat, setHoursFormat] = useState<'hours_minutes' | 'decimal'>(() => {
@@ -79,6 +102,20 @@ export const WeekPage: React.FC = () => {
     loadWeekData();
   }, [user, selectedWeekStart]);
 
+  // Active featured categories for calculations
+  const activeFeaturedCategories = useMemo(() => {
+    if (sessionFeaturedCategories && sessionFeaturedCategories.length > 0) {
+      return sessionFeaturedCategories;
+    }
+    if (
+      fetchedData?.settings?.work_report_categories &&
+      fetchedData.settings.work_report_categories.length > 0
+    ) {
+      return fetchedData.settings.work_report_categories;
+    }
+    return ['work'];
+  }, [sessionFeaturedCategories, fetchedData?.settings?.work_report_categories]);
+
   // 4. Compute week summary
   const summary: WeekSummaryResult = useMemo(() => {
     return computeWeekSummary({
@@ -88,8 +125,9 @@ export const WeekPage: React.FC = () => {
       weekStart: selectedWeekStart,
       now: new Date(),
       previousSegments: fetchedData?.previousSegments || [],
+      featuredCategories: activeFeaturedCategories,
     });
-  }, [fetchedData, selectedWeekStart, timeZone]);
+  }, [fetchedData, selectedWeekStart, timeZone, activeFeaturedCategories]);
 
   // 5. Navigation bounds
   const currentWeekStart = useMemo(
@@ -157,8 +195,10 @@ export const WeekPage: React.FC = () => {
     }
   };
 
-  const longestWorkDay = Math.max(1, ...summary.work.perDay);
+  const longestFeaturedDay = Math.max(1, ...summary.featured.perDay);
   const dayInitials = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  const cardTitle = getFeaturedCardTitle(summary.featured.categoriesUsed, isCurrentWeek);
+  const comparisonFeaturedLabel = getFeaturedCardTitle(summary.featured.categoriesUsed, false);
 
   return (
     <div className="week-page-container">
@@ -211,13 +251,11 @@ export const WeekPage: React.FC = () => {
         </div>
       )}
 
-      {/* 6.2 Hours Worked (Hero Card) */}
+      {/* 6.2 Featured Categories (Hero Card) */}
       {(loading || summary.loggedMs > 0) && (
         <Card ornamental className="week-hero-card">
           <div className="week-hero-header">
-            <span className="week-hero-label">
-              {isCurrentWeek ? 'Hours worked so far' : 'Hours worked'}
-            </span>
+            <span className="week-hero-label">{cardTitle}</span>
           </div>
 
           <div className="week-hero-number-wrap">
@@ -225,40 +263,52 @@ export const WeekPage: React.FC = () => {
               type="button"
               className="week-hero-number-btn"
               onClick={toggleHoursFormat}
-              aria-label={`Hours worked: ${hoursFormat === 'decimal' ? formatDecimalHours(summary.work.totalMinutes) : formatHoursMinutes(summary.work.totalMinutes)}. Tap to toggle format.`}
+              aria-label={`${cardTitle}: ${hoursFormat === 'decimal' ? formatDecimalHours(summary.featured.totalMinutes) : formatHoursMinutes(summary.featured.totalMinutes)}. Tap to toggle format.`}
               title="Tap to toggle format"
             >
               <span className="week-hero-number">
                 {hoursFormat === 'decimal'
-                  ? formatDecimalHours(summary.work.totalMinutes)
-                  : formatHoursMinutes(summary.work.totalMinutes)}
+                  ? formatDecimalHours(summary.featured.totalMinutes)
+                  : formatHoursMinutes(summary.featured.totalMinutes)}
               </span>
             </button>
           </div>
 
-          {summary.work.totalMinutes === 0 && summary.loggedMs > 0 && (
+          {summary.featured.totalMinutes === 0 && summary.loggedMs > 0 && !summary.featured.noValidCategories && (
             <p className="week-zero-work-notice">
-              Nothing logged in the work categories this week.
+              Nothing logged in {summary.featured.categoriesUsed.join(', ')} this week.
             </p>
           )}
 
-          {summary.work.missingCategories.length > 0 && (
+          {summary.featured.missingCategories.length > 0 && (
             <p className="week-missing-cat-notice">
-              Some work categories no longer exist.{' '}
+              Some categories no longer exist.{' '}
               <Link to="/settings" className="week-settings-link">
                 Check Settings.
               </Link>
             </p>
           )}
 
-          {/* 7 Vertical Daily Work Bars */}
+          {summary.featured.noValidCategories && (
+            <div className="week-no-cat-prompt">
+              <button
+                type="button"
+                className="week-choose-cat-btn"
+                onClick={() => setWorkCategoriesSheetOpen(true)}
+              >
+                Choose a category to feature.
+              </button>
+            </div>
+          )}
+
+          {/* 7 Vertical Daily Featured Bars */}
           <div
             className="week-bars-container"
             role="img"
-            aria-label={`Hours worked per day, total ${formatHoursMinutes(summary.work.totalMinutes)}`}
+            aria-label={`${cardTitle} per day, total ${formatHoursMinutes(summary.featured.totalMinutes)}`}
           >
-            {summary.work.perDay.map((min, idx) => {
-              const heightPct = Math.min(100, (min / longestWorkDay) * 100);
+            {summary.featured.perDay.map((min, idx) => {
+              const heightPct = Math.min(100, (min / longestFeaturedDay) * 100);
               const formattedDayTime =
                 hoursFormat === 'decimal'
                   ? `${(min / 60).toFixed(1)}h`.replace('.0h', 'h')
@@ -279,19 +329,32 @@ export const WeekPage: React.FC = () => {
             })}
           </div>
 
-          {/* Counting categories info */}
+          {/* Counting categories info (tappable control with down-arrow) */}
           <div className="week-counting-line">
-            <span className="week-counting-text">
-              Counting:{' '}
-              <button
-                type="button"
-                className="week-counting-btn"
-                onClick={() => setWorkCategoriesSheetOpen(true)}
-                aria-label="Change work categories in settings"
+            <button
+              type="button"
+              className="week-counting-btn"
+              onClick={() => setWorkCategoriesSheetOpen(true)}
+              aria-label={`Counting: ${summary.featured.categoriesUsed.join(', ') || 'none'}. Tap to change featured categories.`}
+            >
+              <span className="week-counting-text">
+                Counting: {summary.featured.categoriesUsed.join(', ') || 'none'}
+              </span>
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="week-counting-chevron"
+                aria-hidden="true"
               >
-                {summary.work.categoriesUsed.join(', ') || 'none'}
-              </button>
-            </span>
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
           </div>
 
           {/* Copy for my report */}
@@ -454,12 +517,12 @@ export const WeekPage: React.FC = () => {
           ) : (
             <div className="week-comparison-list" role="list">
               <div className="week-comparison-row week-comparison-work-row" role="listitem">
-                <span className="week-comparison-label">Hours worked</span>
+                <span className="week-comparison-label">{comparisonFeaturedLabel}</span>
                 <span className="week-comparison-delta">
-                  {summary.comparison.workDeltaMinutes > 0
-                    ? `+${formatHoursMinutes(summary.comparison.workDeltaMinutes)}`
-                    : summary.comparison.workDeltaMinutes < 0
-                    ? `-${formatHoursMinutes(Math.abs(summary.comparison.workDeltaMinutes))}`
+                  {summary.comparison.featuredDeltaMinutes > 0
+                    ? `+${formatHoursMinutes(summary.comparison.featuredDeltaMinutes)}`
+                    : summary.comparison.featuredDeltaMinutes < 0
+                    ? `-${formatHoursMinutes(Math.abs(summary.comparison.featuredDeltaMinutes))}`
                     : 'no change'}
                 </span>
               </div>
@@ -618,19 +681,30 @@ export const WeekPage: React.FC = () => {
         onClose={() => setSelectedDayForSheet(null)}
       />
 
-      {/* Work Categories Multi-select Sheet */}
+      {/* Featured Categories Multi-select Sheet */}
       {user && (
         <WorkCategoriesSheet
           isOpen={workCategoriesSheetOpen}
           userId={user.id}
           categories={fetchedData?.settings?.categories || []}
-          workCategories={summary.work.categoriesUsed}
+          selectedCategories={summary.featured.categoriesUsed}
           onClose={() => setWorkCategoriesSheetOpen(false)}
-          onWorkCategoriesUpdated={(_newCats) => {
-            loadWeekData();
-            setToastMsg('Work categories updated');
+          onSelectionChanged={(newCats) => {
+            setSessionFeaturedCategories(newCats);
+            try {
+              sessionStorage.setItem(SESSION_STORAGE_FEATURED_KEY, JSON.stringify(newCats));
+            } catch {
+              // ignore
+            }
+          }}
+          onWorkCategoriesUpdated={(newDefault) => {
+            if (fetchedData?.settings) {
+              fetchedData.settings.work_report_categories = newDefault;
+            }
+            setToastMsg('Saved as default');
           }}
           onToast={setToastMsg}
+          mode="view"
         />
       )}
 

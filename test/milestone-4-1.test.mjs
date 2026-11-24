@@ -77,7 +77,8 @@ console.log('[Test 1] Segment fully inside the week is counted exactly...');
   assert.strictEqual(summary.loggedMs, expectedMs, 'Logged ms should be 150 minutes');
   assert.strictEqual(summary.countedMs, expectedMs, 'Counted ms should be 150 minutes');
   assert.strictEqual(summary.vacationMs, 0, 'Vacation ms should be 0');
-  assert.strictEqual(summary.work.totalMinutes, 150, 'Work total minutes should be 150');
+  assert.strictEqual(summary.featured.totalMinutes, 150, 'Featured total minutes should be 150');
+  assert.strictEqual(summary.work.totalMinutes, 150, 'Work total minutes alias should match');
   assert.strictEqual(summary.byCategory.length, 1, 'Should have 1 category');
   assert.strictEqual(summary.byCategory[0].category, 'work');
   assert.strictEqual(summary.byCategory[0].minutes, 150);
@@ -110,8 +111,8 @@ console.log('[Test 2] Segment crossing Sunday 24:00 (Monday 00:00) into next wee
 
   // Only 2 hours (120 min) should count
   assert.strictEqual(summary.loggedMs, 120 * 60 * 1000, 'Logged ms should only include 120 min before Monday 00:00');
-  assert.strictEqual(summary.work.totalMinutes, 120, 'Work total minutes should be 120');
-  assert.strictEqual(summary.work.perDay[6], 120, 'Sunday work minutes should be 120');
+  assert.strictEqual(summary.featured.totalMinutes, 120, 'Featured total minutes should be 120');
+  assert.strictEqual(summary.featured.perDay[6], 120, 'Sunday featured minutes should be 120');
 }
 console.log('✓ Test 2 passed.\n');
 
@@ -139,8 +140,8 @@ console.log('[Test 3] Segment crossing Monday 00:00 from previous week is clippe
   });
 
   assert.strictEqual(summary.loggedMs, 150 * 60 * 1000, 'Logged ms should only include 150 min starting Monday 00:00');
-  assert.strictEqual(summary.work.totalMinutes, 150, 'Work total minutes should be 150');
-  assert.strictEqual(summary.work.perDay[0], 150, 'Monday work minutes should be 150');
+  assert.strictEqual(summary.featured.totalMinutes, 150, 'Featured total minutes should be 150');
+  assert.strictEqual(summary.featured.perDay[0], 150, 'Monday featured minutes should be 150');
 }
 console.log('✓ Test 3 passed.\n');
 
@@ -177,16 +178,26 @@ console.log('[Test 4] Vacation segments excluded from counted time & work hours.
         on_vacation: true,
       },
     ],
-    settings: { timezone: TZ_PHX, work_report_categories: ['work', 'vacation'] }, // Even if vacation was in work cats
+    settings: { timezone: TZ_PHX, work_report_categories: ['work'] },
   });
 
   assert.strictEqual(summary.loggedMs, (480 + 240 + 120) * 60 * 1000, 'Total logged ms includes vacation');
   assert.strictEqual(summary.vacationMs, (240 + 120) * 60 * 1000, 'Vacation ms is 360m');
   assert.strictEqual(summary.countedMs, 480 * 60 * 1000, 'Counted ms excludes vacation (480m)');
-  assert.strictEqual(summary.work.totalMinutes, 480, 'Vacation never adds to work total');
+  assert.strictEqual(summary.featured.totalMinutes, 480, 'Vacation never adds to featured total unless featured');
   assert.strictEqual(summary.byCategory.length, 1, 'byCategory excludes vacation rows');
   assert.strictEqual(summary.byCategory[0].category, 'work');
   assert.strictEqual(summary.byCategory[0].shareOfCounted, 100);
+
+  // If vacation itself is featured, vacation time counts normally
+  const summaryVac = computeWeekSummary({
+    weekStart: weekStartNov16,
+    now: weekEndNov23,
+    segments: [sWork, sVacationCategory, sVacationParent],
+    entries: [{ id: 'e-vac', on_vacation: true }],
+    settings: { timezone: TZ_PHX, work_report_categories: ['work', 'vacation'] },
+  });
+  assert.strictEqual(summaryVac.featured.totalMinutes, 840, 'When vacation is featured, vacation time counts');
 }
 console.log('✓ Test 4 passed.\n');
 
@@ -221,8 +232,8 @@ console.log('[Test 5] Several work categories all add to work total...');
     },
   });
 
-  assert.strictEqual(summary.work.totalMinutes, 210, 'Work total should be 120 + 90 = 210m');
-  assert.deepStrictEqual(summary.work.categoriesUsed, ['work', 'job search']);
+  assert.strictEqual(summary.featured.totalMinutes, 210, 'Featured total should be 120 + 90 = 210m');
+  assert.deepStrictEqual(summary.featured.categoriesUsed, ['work', 'job search']);
 }
 console.log('✓ Test 5 passed.\n');
 
@@ -253,12 +264,12 @@ console.log('[Test 6] Day-level rounding: days rounded first, week total equals 
     settings: { timezone: TZ_PHX, work_report_categories: ['work'] },
   });
 
-  assert.strictEqual(summary.work.perDay[0], 1, 'Monday should round to 1m');
-  assert.strictEqual(summary.work.perDay[1], 1, 'Tuesday should round to 1m');
-  assert.strictEqual(summary.work.perDay[2], 0, 'Wednesday should be 0m');
-  const sumPerDay = summary.work.perDay.reduce((a, b) => a + b, 0);
-  assert.strictEqual(summary.work.totalMinutes, sumPerDay, 'Week total must strictly equal sum of perDay numbers');
-  assert.strictEqual(summary.work.totalMinutes, 2, 'Week total should be 2 minutes, not 3');
+  assert.strictEqual(summary.featured.perDay[0], 1, 'Monday should round to 1m');
+  assert.strictEqual(summary.featured.perDay[1], 1, 'Tuesday should round to 1m');
+  assert.strictEqual(summary.featured.perDay[2], 0, 'Wednesday should be 0m');
+  const sumPerDay = summary.featured.perDay.reduce((a, b) => a + b, 0);
+  assert.strictEqual(summary.featured.totalMinutes, sumPerDay, 'Week total must strictly equal sum of perDay numbers');
+  assert.strictEqual(summary.featured.totalMinutes, 2, 'Week total should be 2 minutes, not 3');
 }
 console.log('✓ Test 6 passed.\n');
 
@@ -457,8 +468,8 @@ console.log('[Test 11] Empty week returns clean zeros and no errors...');
   assert.strictEqual(summary.loggedMs, 0);
   assert.strictEqual(summary.vacationMs, 0);
   assert.strictEqual(summary.countedMs, 0);
-  assert.strictEqual(summary.work.totalMinutes, 0);
-  assert.deepStrictEqual(summary.work.perDay, [0, 0, 0, 0, 0, 0, 0]);
+  assert.strictEqual(summary.featured.totalMinutes, 0);
+  assert.deepStrictEqual(summary.featured.perDay, [0, 0, 0, 0, 0, 0, 0]);
   assert.strictEqual(summary.byCategory.length, 0);
   assert.strictEqual(summary.byDay.length, 7);
   for (const day of summary.byDay) {
@@ -502,7 +513,7 @@ console.log('[Test 12] Overlapping segments count each minute once...');
   });
 
   assert.strictEqual(summary.loggedMs, 90 * 60 * 1000, 'Logged time must be 90m for overlapping segments');
-  assert.strictEqual(summary.work.totalMinutes, 90, 'Work total must be 90m');
+  assert.strictEqual(summary.featured.totalMinutes, 90, 'Featured total must be 90m');
   assert.strictEqual(summary.byCategory[0].minutes, 90, 'Category total must be 90m');
 }
 console.log('✓ Test 12 passed.\n');
@@ -530,7 +541,7 @@ console.log('[Test 13] Percentages use counted time; week of only vacation does 
   assert.strictEqual(summary.vacationMs, 8 * 3600 * 1000);
   assert.strictEqual(summary.countedMs, 0);
   assert.strictEqual(summary.isAllVacation, true);
-  assert.strictEqual(summary.work.totalMinutes, 0);
+  assert.strictEqual(summary.featured.totalMinutes, 0);
   assert.strictEqual(summary.byCategory.length, 0);
 
   // Week with 2h work and 2h chores (counted = 4h = 240m)

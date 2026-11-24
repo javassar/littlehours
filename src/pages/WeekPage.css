@@ -214,30 +214,73 @@
   white-space: nowrap;
 }
 
-/* Counting line */
+/* Counting control under big number */
 .week-counting-line {
+  display: flex;
+  justify-content: center;
   margin-bottom: 18px;
+}
+
+.week-counting-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background-color: rgba(246, 237, 234, 0.65);
+  border: 1px solid rgba(184, 114, 127, 0.25);
+  border-radius: var(--radius-button);
+  padding: 6px 14px;
+  min-height: 44px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.week-counting-btn:hover {
+  background-color: rgba(217, 165, 174, 0.2);
+  border-color: var(--rose-deep);
 }
 
 .week-counting-text {
   font-family: var(--font-body);
-  font-size: 12px;
-  color: var(--mauve);
-}
-
-.week-counting-btn {
-  background: none;
-  border: none;
-  padding: 2px 4px;
-  font-family: inherit;
-  font-size: inherit;
-  color: var(--rose-deep);
-  text-decoration: underline;
-  cursor: pointer;
-}
-
-.week-counting-btn:hover {
+  font-size: 13px;
   color: var(--ink);
+}
+
+.week-counting-chevron {
+  color: var(--rose-deep);
+  flex-shrink: 0;
+  transition: transform var(--transition-fast);
+}
+
+.week-counting-btn:hover .week-counting-chevron {
+  transform: translateY(1px);
+}
+
+.week-no-cat-prompt {
+  text-align: center;
+  margin: 12px 0 16px;
+}
+
+.week-choose-cat-btn {
+  background: none;
+  border: 1px dashed var(--rose-deep);
+  border-radius: var(--radius-button);
+  color: var(--rose-deep);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 8px 16px;
+  min-height: 44px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.week-choose-cat-btn:hover {
+  background-color: rgba(217, 165, 174, 0.15);
+  border-style: solid;
 }
 
 /* Copy button */
